@@ -15,6 +15,12 @@ param(
   [string]$MirrorPrefix = ''
 )
 
+# Support environment variable override for one-liner usage
+if ([string]::IsNullOrEmpty($MirrorPrefix) -and $env:MIRROR_PREFIX) {
+  $MirrorPrefix = $env:MIRROR_PREFIX
+  Write-Info "Using mirror from environment: $MirrorPrefix"
+}
+
 $ErrorActionPreference = 'Stop'
 
 #region Output Functions
@@ -363,6 +369,3 @@ Write-Host '  tailscale amnezia-wg set'
 Write-Host '  tailscale amnezia-wg get'
 Write-Host '  tailscale amnezia-wg reset'
 Write-Host ''
-Write-Host 'If download is slow, you can use GitHub mirror:'
-Write-Host '  iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 -OutFile install.ps1'
-Write-Host '  .\install.ps1 -MirrorPrefix "https://your-mirror-site.com"'
