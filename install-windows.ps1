@@ -132,8 +132,8 @@ function Test-PeArchitecture([string]$Path, [string]$ExpectedArch) {
       $fs.Seek([int64]$peOff, [System.IO.SeekOrigin]::Begin) | Out-Null
       if ($br.ReadUInt32() -ne 0x00004550) { return @{ Valid = $false; Reason = 'Invalid PE signature' } }
       $machine = $br.ReadUInt16()
-      $archMap = @{ 0x8664 = 'amd64'; 0xAA64 = 'arm64'; 0x014c = 'x86' }
-      $detectedArch = $archMap[$machine]
+      $archMap = @{ [UInt16]0x8664 = 'amd64'; [UInt16]0xAA64 = 'arm64'; [UInt16]0x014c = 'x86' }
+      $detectedArch = $archMap[[UInt16]$machine]
       if (-not $detectedArch) { $detectedArch = "unknown(0x{0:X4})" -f $machine }
       $isValid = ($detectedArch -eq $ExpectedArch)
       $reason = if (-not $isValid) { "Expected $ExpectedArch, got $detectedArch" } else { $null }
