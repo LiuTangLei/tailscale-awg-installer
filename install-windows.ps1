@@ -34,8 +34,11 @@ $platform = "windows-$arch"
 
 # Resolve install paths (default program files)
 $defaultDir = "$Env:ProgramFiles\Tailscale"
-$tsPath = (Get-Command tailscale.exe -ErrorAction SilentlyContinue)?.Source
-$tsdPath = (Get-Command tailscaled.exe -ErrorAction SilentlyContinue)?.Source
+# PowerShell 5.1-compatible resolution (avoid null-conditional operator)
+$tsCmd = Get-Command tailscale.exe -ErrorAction SilentlyContinue
+$tsPath = if ($tsCmd) { $tsCmd.Source } else { $null }
+$tsdCmd = Get-Command tailscaled.exe -ErrorAction SilentlyContinue
+$tsdPath = if ($tsdCmd) { $tsdCmd.Source } else { $null }
 if (-not $tsPath) { $tsPath = Join-Path $defaultDir 'tailscale.exe' }
 if (-not $tsdPath) { $tsdPath = Join-Path $defaultDir 'tailscaled.exe' }
 
@@ -120,7 +123,7 @@ finally {
 
 # (Re)create service if needed
 $svc = Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
-if ($NeedsServiceCreate -and -not $svc) {
+if ($script:NeedsServiceCreate -and -not $svc) {
   Write-Info 'Registering Tailscale service...'
   New-Service -Name 'Tailscale' -BinaryPathName '"{0}"' -f $tsdPath -DisplayName 'Tailscale Daemon' -Description 'Tailscale WireGuard-based VPN' -StartupType Automatic | Out-Null
   $svc = Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
