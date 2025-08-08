@@ -98,9 +98,6 @@ install_binaries() {
 	if [[ ${VERSION} == "latest" ]]; then
 		log_info "Fetching latest release tag..."
 		local api_url="https://api.github.com/repos/${REPO}/releases/latest"
-		if [[ -n ${MIRROR_PREFIX} ]]; then
-			api_url="${MIRROR_PREFIX}/https://api.github.com/repos/${REPO}/releases/latest"
-		fi
 		local latest_tag
 		latest_tag=$(curl -fsSL "${api_url}" | grep '"tag_name"' | sed -E 's/.*"([^\"]+)".*/\1/')
 		[[ -z ${latest_tag} ]] && {
@@ -114,6 +111,7 @@ install_binaries() {
 	local base_url="https://github.com/${REPO}/releases/download/${VERSION}"
 	if [[ -n ${MIRROR_PREFIX} ]]; then
 		base_url="${MIRROR_PREFIX}/https://github.com/${REPO}/releases/download/${VERSION}"
+		log_info "Using mirror for downloads: ${MIRROR_PREFIX}"
 	fi
 
 	local tailscale_binary="tailscale-${platform}"

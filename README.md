@@ -14,19 +14,12 @@ We provide separate, reliable installers per OS.
 - macOS: `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash`
 - Windows (PowerShell as Admin): `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 | iex`
 
-**If GitHub download is slow**: Use GitHub mirror service:
-
-```bash
-# Linux with mirror
-curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --mirror https://your-mirror-site.com
-
-# macOS with mirror
-curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash -s -- --mirror https://your-mirror-site.com
-
-# Windows with mirror (alternative)
-iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 -OutFile install.ps1
-.\install.ps1 -MirrorPrefix 'https://your-mirror-site.com'
-```
+<sub>
+If GitHub download is slow, you can use a mirror for binary downloads<br>
+Linux: <code>curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh \| bash -s -- --mirror https://your-mirror-site.com</code><br>
+macOS: <code>curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash -s -- --mirror https://your-mirror-site.com</code><br>
+Windows: <code>iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 -OutFile install.ps1; .\install.ps1 -MirrorPrefix 'https://your-mirror-site.com'</code>
+</sub>
 
 ### Manual Download
 
