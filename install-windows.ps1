@@ -207,16 +207,29 @@ if (-not (Get-Command tailscale.exe -ErrorAction SilentlyContinue) -and -not $sv
 } else {
   Write-Info 'Tailscale found; will replace binaries only'
 }
+
+$svc = Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
+if ($svc) {
+  $svcCfg = Get-CimInstance Win32_Service -Filter "Name='Tailscale'" -ErrorAction SilentlyContinue
+  if ($svcCfg -and $svcCfg.PathName) {
+    $exePath = ($svcCfg.PathName -replace '^"([^"]+)".*', '$1')
+    if (Test-Path $exePath) {
+      $tsdPath = $exePath
+      $defaultDir = Split-Path -Path $tsdPath -Parent
+      $tsPath = "$defaultDir\tailscale.exe"
+    }
+  }
+}
 #endregion
 
 #region Binary Download and Installation
-# Stop service and kill processes
-if ($svc -and $svc.Status -eq 'Running') {
-  Write-Info 'Stopping Tailscale service...'
-  Stop-ServiceCompat -Name 'Tailscale'
-  Wait-ServiceStatus -Name 'Tailscale' -Status 'Stopped' -TimeoutSec 30
-}
-Get-Process -Name 'tailscaled', 'tailscale' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Write-Info 'Stopping Tailscale service (if running)...'
+Stop-ServiceCompat -Name 'Tailscale' | Out-Null
+Wait-ServiceStatus -Name 'Tailscale' -Status 'Stopped' -TimeoutSec 60 | Out-Null
+
+Get-Process -Name 'tailscaled','tailscale','tailscale-ipn' -ErrorAction SilentlyContinue |
+  Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 800
 
 # Resolve version and download URLs
 if ($Version -eq 'latest') {
@@ -280,8 +293,18 @@ try {
   if (Test-Path $tsPath) { Copy-Item -Force $tsPath "$tsPath.bak" -ErrorAction SilentlyContinue }
   if (Test-Path $tsdPath) { Copy-Item -Force $tsdPath "$tsdPath.bak" -ErrorAction SilentlyContinue }
 
-  Copy-Item -Force $tsFile $tsPath
-  Copy-Item -Force $tsdFile $tsdPath
+  $attempt = 0
+  while ($true) {
+    try {
+      Copy-Item -Force $tsFile $tsPath
+      Copy-Item -Force $tsdFile $tsdPath
+      break
+    } catch [System.IO.IOException] {
+      if ($attempt -ge 10) { throw }
+      Start-Sleep -Milliseconds 500
+      $attempt++
+    }
+  }
   Unblock-File -Path $tsPath, $tsdPath -ErrorAction SilentlyContinue
 
   Write-Ok 'Binaries installed'
