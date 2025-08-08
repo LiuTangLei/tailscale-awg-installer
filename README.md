@@ -10,9 +10,9 @@ Drop-in replacement for official Tailscale with **Amnezia-WG 1.5** protocol masq
 
 We provide separate, reliable installers per OS.
 
-- Linux: `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale/install-scripts/install-linux.sh | bash`
-- macOS: `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale/install-scripts/install-macos.sh | bash`
-- Windows (PowerShell as Admin): `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale/install-scripts/install-windows.ps1 | iex`
+- Linux: `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash`
+- macOS: `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash`
+- Windows (PowerShell as Admin): `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 | iex`
 
 ### Manual Download
 
@@ -116,7 +116,7 @@ tailscale amnezia-wg set '{"jc":2,"i1":"<b 0xc0><r 16>","i2":"<b 0x40><r 12>"}'
 tailscale amnezia-wg set '{"s1":10,"s2":15,"i1":"<b 0xc0><r 32><c><t>"}'
 
 # Maximum obfuscation - complex signature chain
-tailscale amnezia-wg set '{"jc":6,"s1":15,"s2":20","i1":"<b 0xc0><r 32><c><t>","i2":"<b 0x40><r 16><t>"}'
+tailscale amnezia-wg set '{"jc":6,"s1":15,"s2":20,"i1":"<b 0xc0><r 32><c><t>","i2":"<b 0x40><r 16><t>"}'
 ```
 
 ## 🎯 Use Cases
@@ -126,7 +126,7 @@ tailscale amnezia-wg set '{"jc":6,"s1":15,"s2":20","i1":"<b 0xc0><r 32><c><t>","
 | **Basic DPI bypass** | `{"jc":4,"jmin":40,"jmax":70}` | ✅ Works with standard peers |
 | **Corporate firewall** | `{"jc":4,"i1":"<b 0xc0><r 16>"}` | ✅ Works with standard peers |
 | **Deep packet inspection** | `{"s1":10,"s2":15,"i1":"<b 0xc0><r 32><c><t>"}` | ❌ All nodes need this fork |
-| **Government censorship** | `{"jc":6,"s1":15,"s2":20","i1":"...","i2":"..."}` | ❌ All nodes need this fork |
+| **Government censorship** | `{"jc":6,"s1":15,"s2":20,"i1":"...","i2":"..."}` | ❌ All nodes need this fork |
 
 ## 📊 Platform Support
 
@@ -226,8 +226,8 @@ tailscale amnezia-wg set '{"jc":2,"jmin":40,"jmax":60}'
 
 This is a fork of [Tailscale](https://github.com/tailscale/tailscale) with integrated [Amnezia-WG 1.5](https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted) protocol masquerading.
 
-- **Report issues**: [GitHub Issues](https://github.com/LiuTangLei/tailscale/issues)
-- **Source code**: [GitHub Repository](https://github.com/LiuTangLei/tailscale)
+- **Report issues (installer scripts)**: [GitHub Issues](https://github.com/LiuTangLei/tailscale-awg-installer/issues)
+- **Core fork source code**: [GitHub Repository](https://github.com/LiuTangLei/tailscale)
 - **Official docs**: [Amnezia-WG Documentation](https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted)
 
 ## 📄 License

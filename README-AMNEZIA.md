@@ -6,9 +6,9 @@ A Tailscale fork that integrates Amnezia‑WG 1.5 capabilities for advanced DPI 
 
 Use the per-OS one‑click installers:
 
-- Linux: `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale/install-scripts/install-linux.sh | bash`
-- macOS: `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale/install-scripts/install-macos.sh | bash`
-- Windows (PowerShell as Admin): `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale/install-scripts/install-windows.ps1 | iex`
+- Linux: `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash`
+- macOS: `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash`
+- Windows (PowerShell as Admin): `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 | iex`
 
 For details and manual installation, see the top‑level README.
 
