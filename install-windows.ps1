@@ -1,139 +1,332 @@
 # Windows-only installer (PowerShell): replace official Tailscale with Amnezia-WG-enabled binaries
-# Requires: PowerShell 5+, Administrator rights.
+# Compatible with Windows PowerShell 5.1 and PowerShell 7+
+# Requires: Admin
 
+[CmdletBinding()]
 param(
   [string]$Repo = 'LiuTangLei/tailscale',
-  [string]$Version = 'latest'
+  [string]$Version = 'latest',
+  [string]$InstallDir,
+  [switch]$EnableMsiFallback = $true
 )
 
 $ErrorActionPreference = 'Stop'
 
-function Write-Info($m){ Write-Host "[INFO] $m" -ForegroundColor Cyan }
-function Write-Ok($m){ Write-Host "[SUCCESS] $m" -ForegroundColor Green }
-function Write-Warn($m){ Write-Host "[WARNING] $m" -ForegroundColor Yellow }
-function Write-Err($m){ Write-Host "[ERROR] $m" -ForegroundColor Red }
+#region Output Functions
+function Write-Info($m) { Write-Host "[INFO] $m" -ForegroundColor Cyan }
+function Write-Ok($m) { Write-Host "[SUCCESS] $m" -ForegroundColor Green }
+function Write-Warn($m) { Write-Host "[WARNING] $m" -ForegroundColor Yellow }
+function Write-Err($m) { Write-Host "[ERROR] $m" -ForegroundColor Red }
+#endregion
 
-# Admin check
+#region System Validation
+# Basic compatibility setup
+$IsCore = ($PSVersionTable.PSEdition -eq 'Core' -or $PSVersionTable.PSVersion.Major -ge 6)
+if (-not $IsCore) {
+  try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    $ProgressPreference = 'SilentlyContinue'
+  } catch {}
+}
+
+# System requirements check
+try { $osVer = [version]((Get-CimInstance Win32_OperatingSystem).Version) }
+catch { $osVer = [System.Environment]::OSVersion.Version }
+
+if ($osVer.Major -lt 10) {
+  Write-Err "Unsupported Windows version ($osVer). Requires Windows 10+."
+  exit 1
+}
+if (-not [Environment]::Is64BitOperatingSystem) {
+  Write-Err 'Unsupported 32-bit Windows. Only 64-bit (amd64/arm64) is supported.'
+  exit 1
+}
+
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
   Write-Err "Please run this script as Administrator"
   exit 1
 }
 
-# Track whether we need to create the service in minimal local install mode
-$script:NeedsServiceCreate = $false
-
-# Arch detection
-$arch = (Get-CimInstance Win32_Processor).Architecture
-switch ($arch) {
-  9 { $arch = 'amd64' } # x64
-  12 { $arch = 'arm64' }
-  default { Write-Err "Unsupported arch: $arch"; exit 1 }
+# Architecture detection
+$arch = switch ((Get-CimInstance Win32_Processor).Architecture) {
+  9 { 'amd64' }
+  12 { 'arm64' }
+  default { Write-Err "Unsupported arch: $_"; exit 1 }
 }
 $platform = "windows-$arch"
+#endregion
 
-# Resolve install paths (default program files)
-$defaultDir = "$Env:ProgramFiles\Tailscale"
-# PowerShell 5.1-compatible resolution (avoid null-conditional operator)
+#region Web Helper Functions
+$UA = @{ 'User-Agent' = "tailscale-installer pwsh/$($PSVersionTable.PSVersion)"; 'Accept' = 'application/vnd.github+json' }
+
+function Invoke-RestCompat([string]$Uri) {
+  $p = @{ Uri = $Uri; Headers = $UA }
+  if (-not $IsCore -and (Get-Command Invoke-RestMethod).Parameters.Keys -contains 'UseBasicParsing') {
+    $p.UseBasicParsing = $true
+  }
+  Invoke-RestMethod @p
+}
+
+function Invoke-WebRequestCompat([string]$Uri, [string]$OutFile) {
+  $p = @{ Uri = $Uri; OutFile = $OutFile; Headers = $UA }
+  if (-not $IsCore -and (Get-Command Invoke-WebRequest).Parameters.Keys -contains 'UseBasicParsing') {
+    $p.UseBasicParsing = $true
+  }
+  Invoke-WebRequest @p
+}
+#endregion
+
+#region Service Management Functions
+function Wait-ServiceStatus([string]$Name, [ValidateSet('Running', 'Stopped')][string]$Status, [int]$TimeoutSec = 30) {
+  $sw = [Diagnostics.Stopwatch]::StartNew()
+  while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
+    $s = Get-Service -Name $Name -ErrorAction SilentlyContinue
+    if ($s -and $s.Status -eq $Status) { return $true }
+    Start-Sleep -Milliseconds 400
+  }
+  return $false
+}
+
+function Start-ServiceCompat([string]$Name) {
+  try {
+    Start-Service -Name $Name -ErrorAction Stop
+    return $true
+  } catch {
+    Write-Warn "Start-Service failed: $($_.Exception.Message). Trying 'net start'..."
+    try {
+      net start $Name | Out-Null
+      return ($LASTEXITCODE -eq 0)
+    } catch {
+      return $false
+    }
+  }
+}
+
+function Stop-ServiceCompat([string]$Name) {
+  try {
+    Stop-Service -Name $Name -Force -ErrorAction Stop
+    return $true
+  } catch {
+    Write-Warn "Stop-Service failed: $($_.Exception.Message). Trying 'net stop'..."
+    try {
+      net stop $Name | Out-Null
+      return ($LASTEXITCODE -eq 0)
+    } catch {
+      return $false
+    }
+  }
+}
+#endregion
+
+#region Binary Validation
+function Test-PeArchitecture([string]$Path, [string]$ExpectedArch) {
+  if (-not (Test-Path $Path)) { return @{ Valid = $false; Reason = 'File not found' } }
+  try {
+    $fs = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+    try {
+      $br = New-Object System.IO.BinaryReader($fs)
+      if ($br.ReadUInt16() -ne 0x5A4D) { return @{ Valid = $false; Reason = 'Invalid PE file' } }
+      $fs.Seek(0x3C, [System.IO.SeekOrigin]::Begin) | Out-Null
+      $peOff = $br.ReadUInt32()
+      $fs.Seek([int64]$peOff, [System.IO.SeekOrigin]::Begin) | Out-Null
+      if ($br.ReadUInt32() -ne 0x00004550) { return @{ Valid = $false; Reason = 'Invalid PE signature' } }
+      $machine = $br.ReadUInt16()
+      $archMap = @{ 0x8664 = 'amd64'; 0xAA64 = 'arm64'; 0x014c = 'x86' }
+      $detectedArch = $archMap[$machine]
+      if (-not $detectedArch) { $detectedArch = "unknown(0x{0:X4})" -f $machine }
+      $isValid = ($detectedArch -eq $ExpectedArch)
+      $reason = if (-not $isValid) { "Expected $ExpectedArch, got $detectedArch" } else { $null }
+      return @{ Valid = $isValid; Arch = $detectedArch; Reason = $reason }
+    } finally { $fs.Dispose() }
+  } catch {
+    return @{ Valid = $false; Reason = $_.Exception.Message }
+  }
+}
+#endregion
+
+#region Path Resolution and Official Install
+# Resolve install paths
+$defaultDir = if ($InstallDir -and $InstallDir.Trim()) { $InstallDir } else { "$Env:ProgramFiles\Tailscale" }
 $tsCmd = Get-Command tailscale.exe -ErrorAction SilentlyContinue
-$tsPath = if ($tsCmd) { $tsCmd.Source } else { $null }
+$tsPath = if ($tsCmd) { $tsCmd.Source } else { "$defaultDir\tailscale.exe" }
 $tsdCmd = Get-Command tailscaled.exe -ErrorAction SilentlyContinue
-$tsdPath = if ($tsdCmd) { $tsdCmd.Source } else { $null }
-if (-not $tsPath) { $tsPath = Join-Path $defaultDir 'tailscale.exe' }
-if (-not $tsdPath) { $tsdPath = Join-Path $defaultDir 'tailscaled.exe' }
+$tsdPath = if ($tsdCmd) { $tsdCmd.Source } else { "$defaultDir\tailscaled.exe" }
 
-# Resolve service path if service exists (use the exact binary used by the service)
+# Use service-configured path if available
 $svc = Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
 if ($svc) {
   $svcCfg = Get-CimInstance Win32_Service -Filter "Name='Tailscale'" -ErrorAction SilentlyContinue
   if ($svcCfg -and $svcCfg.PathName) {
-    $exeCandidate = $svcCfg.PathName
-    if ($exeCandidate.StartsWith('"')) { $exeCandidate = $exeCandidate.Split('"')[1] } else { $exeCandidate = $exeCandidate.Split(' ')[0] }
-    if (Test-Path $exeCandidate) { $tsdPath = $exeCandidate }
-  }
-}
-
-# If not installed, attempt official install; fallback to minimal local install
-function Install-OfficialIfMissing {
-  $hasCmd = [bool](Get-Command tailscale.exe -ErrorAction SilentlyContinue)
-  $hasSvc = [bool](Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue)
-  if ($hasCmd -or $hasSvc) {
-    Write-Info 'Tailscale found; will replace binaries only'
-    return
-  }
-  Write-Warn 'Tailscale not found. Attempting official install via winget...'
-  $installed = $false
-  $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
-  if ($winget) {
-    try {
-      winget install -e --id Tailscale.Tailscale --silent --accept-package-agreements --accept-source-agreements
-      Start-Sleep -Seconds 3
-      if (Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue) { $installed = $true }
-    } catch {
-      Write-Warn 'winget install failed or unavailable.'
+    $exePath = ($svcCfg.PathName -replace '^"([^"]+)".*', '$1') -replace '^([^\s]+).*', '$1'
+    if (Test-Path $exePath) {
+      $tsdPath = $exePath
+      $defaultDir = Split-Path -Path $tsdPath -Parent
+      $tsPath = "$defaultDir\tailscale.exe"
     }
   }
+}
+
+# Install official Tailscale if missing
+$needsServiceCreate = $false
+if (-not (Get-Command tailscale.exe -ErrorAction SilentlyContinue) -and -not $svc) {
+  Write-Warn 'Tailscale not found. Installing official version...'
+  $installed = $false
+
+  # Try winget first
+  if (Get-Command winget.exe -ErrorAction SilentlyContinue) {
+    try {
+      & winget install -e --id Tailscale.Tailscale --silent --accept-package-agreements --accept-source-agreements
+      Start-Sleep -Seconds 3
+      $installed = [bool](Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue)
+    } catch { Write-Warn "winget failed: $($_.Exception.Message)" }
+  }
+
+  # Try MSI if winget failed and enabled
+  if (-not $installed -and $EnableMsiFallback) {
+    $msiUrl = if ($arch -eq 'amd64') { 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' } else { 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-arm64.msi' }
+    try {
+      Write-Warn "Trying MSI installer..."
+      $tmpMsi = "$env:TEMP\tailscale-$([guid]::NewGuid()).msi"
+      Invoke-WebRequestCompat -Uri $msiUrl -OutFile $tmpMsi
+      $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$tmpMsi`"", '/qn', '/norestart') -Wait -PassThru
+      if ($p.ExitCode -in 0, 3010) {
+        Start-Sleep -Seconds 3
+        $installed = [bool](Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue)
+      }
+      Remove-Item -Force $tmpMsi -ErrorAction SilentlyContinue
+    } catch { Write-Warn "MSI failed: $($_.Exception.Message)" }
+  }
+
+  # Fallback to minimal install
   if (-not $installed) {
-    Write-Warn 'Falling back to minimal local install (will register service).'
+    Write-Warn 'Falling back to minimal local install'
     New-Item -ItemType Directory -Force -Path $defaultDir | Out-Null
-    $script:NeedsServiceCreate = $true
+    $needsServiceCreate = $true
+  }
+} else {
+  Write-Info 'Tailscale found; will replace binaries only'
+}
+#endregion
+
+#region Binary Download and Installation
+# Stop service and kill processes
+if ($svc -and $svc.Status -eq 'Running') {
+  Write-Info 'Stopping Tailscale service...'
+  Stop-ServiceCompat -Name 'Tailscale'
+  Wait-ServiceStatus -Name 'Tailscale' -Status 'Stopped' -TimeoutSec 30
+}
+Get-Process -Name 'tailscaled', 'tailscale' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+# Resolve version and download URLs
+if ($Version -eq 'latest') {
+  Write-Info 'Resolving latest release...'
+  try {
+    $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
+    $Version = $resp.tag_name
+    if (-not $Version) { throw 'No tag_name in response' }
+    Write-Info "Latest: $Version"
+  } catch {
+    Write-Err "Failed to resolve latest release: $($_.Exception.Message)"
+    exit 1
   }
 }
 
-Install-OfficialIfMissing
-
-# Stop service if running
-$svc = Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
-if ($svc -and $svc.Status -eq 'Running') {
-  Write-Info 'Stopping Tailscale service...'
-  Stop-Service -Name 'Tailscale' -Force -ErrorAction SilentlyContinue
-}
-
-# Resolve latest tag
-if ($Version -eq 'latest') {
-  Write-Info 'Resolving latest release...'
-  $resp = Invoke-RestMethod -UseBasicParsing -Uri "https://api.github.com/repos/$Repo/releases/latest"
-  $Version = $resp.tag_name
-  if (-not $Version) { Write-Err 'Failed to resolve latest release'; exit 1 }
-  Write-Info "Latest: $Version"
-}
-
-$base = "https://github.com/$Repo/releases/download/$Version"
-$tsUrl = "$base/tailscale-$platform.exe"
-$tsdUrl = "$base/tailscaled-$platform.exe"
-
-$temp = New-Item -ItemType Directory -Path ([System.IO.Path]::GetTempPath()) -Name ("ts-" + [System.Guid]::NewGuid())
+# Try to resolve asset URLs from release
+$tsUrl = $tsdUrl = $null
 try {
-  $tsFile = Join-Path $temp 'tailscale.exe'
-  $tsdFile = Join-Path $temp 'tailscaled.exe'
-  Write-Info "Downloading $tsUrl"
-  Invoke-WebRequest -UseBasicParsing -Uri $tsUrl -OutFile $tsFile
-  Write-Info "Downloading $tsdUrl"
-  Invoke-WebRequest -UseBasicParsing -Uri $tsdUrl -OutFile $tsdFile
+  $rel = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/tags/$Version"
+  $ap = if ($arch -eq 'amd64') { 'amd64|x86_64|x64' } else { 'arm64|aarch64' }
+  $ts = $rel.assets | Where-Object { $_.name -match "(?i)tailscale(?!d).*($ap).*(windows|win).*\.exe$" } | Select-Object -First 1
+  $tsd = $rel.assets | Where-Object { $_.name -match "(?i)tailscaled.*($ap).*(windows|win).*\.exe$" } | Select-Object -First 1
+  if ($ts -and $tsd) {
+    $tsUrl = $ts.browser_download_url
+    $tsdUrl = $tsd.browser_download_url
+    Write-Info "Resolved assets: $($ts.name), $($tsd.name)"
+  }
+} catch { Write-Warn "Could not resolve assets from release: $($_.Exception.Message)" }
 
-  New-Item -ItemType Directory -Force -Path (Split-Path $tsPath) | Out-Null
-  New-Item -ItemType Directory -Force -Path (Split-Path $tsdPath) | Out-Null
+# Fallback to guessed URLs
+if (-not $tsUrl -or -not $tsdUrl) {
+  Write-Warn 'Using fallback asset URLs'
+  $base = "https://github.com/$Repo/releases/download/$Version"
+  $tsUrl = "$base/tailscale-$platform.exe"
+  $tsdUrl = "$base/tailscaled-$platform.exe"
+}
+
+# Download and install
+$temp = New-Item -ItemType Directory -Path $env:TEMP -Name "ts-$([System.Guid]::NewGuid())"
+try {
+  $tsFile = "$temp\tailscale.exe"
+  $tsdFile = "$temp\tailscaled.exe"
+
+  Write-Info "Downloading tailscale..."
+  Invoke-WebRequestCompat -Uri $tsUrl -OutFile $tsFile
+  Write-Info "Downloading tailscaled..."
+  Invoke-WebRequestCompat -Uri $tsdUrl -OutFile $tsdFile
+
+  # Unblock and validate
+  Unblock-File -Path $tsFile, $tsdFile -ErrorAction SilentlyContinue
+  $tsValid = Test-PeArchitecture -Path $tsFile -ExpectedArch $arch
+  $tsdValid = Test-PeArchitecture -Path $tsdFile -ExpectedArch $arch
+
+  if (-not $tsValid.Valid -or -not $tsdValid.Valid) {
+    Write-Err "Invalid binaries: tailscale=$($tsValid.Reason), tailscaled=$($tsdValid.Reason)"
+    exit 1
+  }
+
+  # Install with backup
+  New-Item -ItemType Directory -Force -Path (Split-Path $tsPath), (Split-Path $tsdPath) | Out-Null
+  if (Test-Path $tsPath) { Copy-Item -Force $tsPath "$tsPath.bak" -ErrorAction SilentlyContinue }
+  if (Test-Path $tsdPath) { Copy-Item -Force $tsdPath "$tsdPath.bak" -ErrorAction SilentlyContinue }
+
   Copy-Item -Force $tsFile $tsPath
   Copy-Item -Force $tsdFile $tsdPath
-  Write-Ok 'Binaries installed'
-}
-finally {
-  Remove-Item -Recurse -Force $temp
-}
+  Unblock-File -Path $tsPath, $tsdPath -ErrorAction SilentlyContinue
 
-# (Re)create service if needed
+  Write-Ok 'Binaries installed'
+} finally {
+  Remove-Item -Recurse -Force $temp -ErrorAction SilentlyContinue
+}
+#endregion
+
+#region Service Management
+# Create service if needed
 $svc = Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
-if ($script:NeedsServiceCreate -and -not $svc) {
+if ($needsServiceCreate -and -not $svc) {
   Write-Info 'Registering Tailscale service...'
-  New-Service -Name 'Tailscale' -BinaryPathName '"{0}"' -f $tsdPath -DisplayName 'Tailscale Daemon' -Description 'Tailscale WireGuard-based VPN' -StartupType Automatic | Out-Null
+  $svcArgs = @{
+    Name           = 'Tailscale'
+    BinaryPathName = "`"$tsdPath`""
+    DisplayName    = 'Tailscale Daemon'
+    StartupType    = 'Automatic'
+  }
+  if ((Get-Command New-Service).Parameters.Keys -contains 'Description') {
+    $svcArgs['Description'] = 'Tailscale WireGuard-based VPN'
+  }
+  New-Service @svcArgs | Out-Null
   $svc = Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
 }
 
-# Restart service if available
+# Ensure service points to correct binary and start it
 if ($svc) {
-  Write-Info 'Starting Tailscale service...'
-  Start-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
+  try {
+    sc.exe config Tailscale binPath= "`"$tsdPath`"" | Out-Null
+    Write-Info 'Starting Tailscale service...'
+    if (Start-ServiceCompat -Name 'Tailscale') {
+      if (Wait-ServiceStatus -Name 'Tailscale' -Status 'Running' -TimeoutSec 30) {
+        Write-Ok 'Service started successfully'
+      } else {
+        Write-Warn 'Service command succeeded but not in Running state'
+      }
+    } else {
+      Write-Err 'Service failed to start. Check Event Viewer for details.'
+    }
+  } catch {
+    Write-Err "Service configuration failed: $($_.Exception.Message)"
+  }
 }
+#endregion
 
 Write-Host ''
 Write-Host 'Quick Start:'
