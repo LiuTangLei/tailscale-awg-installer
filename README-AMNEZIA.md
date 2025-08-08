@@ -59,29 +59,29 @@ sudo systemctl restart tailscaled
 
 ## Configuration Parameters
 
-| Parameter | Description | Default | Recommended | Compatibility |
-|-----------|-------------|---------|-------------|---------------|
-| `jc` | Junk packet count | 0 | 3-6 | ✅ Safe with standard WG |
-| `jmin` | Min junk packet size (bytes) | 0 | 40-50 | ✅ Safe with standard WG |
-| `jmax` | Max junk packet size (bytes) | 0 | 70-100 | ✅ Safe with standard WG |
-| `s1` | Init packet prefix length (0-64) | 0 | 10-20 (advanced) | ❌ Breaks standard WG |
-| `s2` | Response packet prefix length (0-64) | 0 | 10-20 (advanced) | ❌ Breaks standard WG |
-| `i1` | Primary signature packet (CPS format) | "" | Protocol-specific | ✅ Safe with standard WG |
-| `i2` | Secondary signature packet (CPS format) | "" | Optional entropy | ✅ Safe with standard WG |
-| `i3` | Tertiary signature packet (CPS format) | "" | Optional entropy | ✅ Safe with standard WG |
-| `i4` | Quaternary signature packet (CPS format) | "" | Optional entropy | ✅ Safe with standard WG |
-| `i5` | Quinary signature packet (CPS format) | "" | Optional entropy | ✅ Safe with standard WG |
+| Parameter | Description                              | Default | Recommended       | Compatibility            |
+| --------- | ---------------------------------------- | ------- | ----------------- | ------------------------ |
+| `jc`      | Junk packet count                        | 0       | 3-6               | ✅ Safe with standard WG |
+| `jmin`    | Min junk packet size (bytes)             | 0       | 40-50             | ✅ Safe with standard WG |
+| `jmax`    | Max junk packet size (bytes)             | 0       | 70-100            | ✅ Safe with standard WG |
+| `s1`      | Init packet prefix length (0-64)         | 0       | 10-20 (advanced)  | ❌ Breaks standard WG    |
+| `s2`      | Response packet prefix length (0-64)     | 0       | 10-20 (advanced)  | ❌ Breaks standard WG    |
+| `i1`      | Primary signature packet (CPS format)    | ""      | Protocol-specific | ✅ Safe with standard WG |
+| `i2`      | Secondary signature packet (CPS format)  | ""      | Optional entropy  | ✅ Safe with standard WG |
+| `i3`      | Tertiary signature packet (CPS format)   | ""      | Optional entropy  | ✅ Safe with standard WG |
+| `i4`      | Quaternary signature packet (CPS format) | ""      | Optional entropy  | ✅ Safe with standard WG |
+| `i5`      | Quinary signature packet (CPS format)    | ""      | Optional entropy  | ✅ Safe with standard WG |
 
 ### Custom Protocol Signature (CPS) Format
 
 CPS packets use tag-based format to emulate protocols:
 
-| Tag | Format | Description | Example |
-|-----|---------|-------------|---------|
-| `b` | `<b hex_data>` | Static bytes to emulate protocols | `<b 0xc0>` (QUIC header) |
-| `c` | `<c>` | Packet counter (32-bit, network byte order) | `<c>` |
-| `t` | `<t>` | Unix timestamp (32-bit, network byte order) | `<t>` |
-| `r` | `<r length>` | Cryptographically secure random bytes | `<r 16>` |
+| Tag | Format         | Description                                 | Example                  |
+| --- | -------------- | ------------------------------------------- | ------------------------ |
+| `b` | `<b hex_data>` | Static bytes to emulate protocols           | `<b 0xc0>` (QUIC header) |
+| `c` | `<c>`          | Packet counter (32-bit, network byte order) | `<c>`                    |
+| `t` | `<t>`          | Unix timestamp (32-bit, network byte order) | `<t>`                    |
+| `r` | `<r length>`   | Cryptographically secure random bytes       | `<r 16>`                 |
 
 **Examples:**
 
@@ -92,7 +92,7 @@ CPS packets use tag-based format to emulate protocols:
 **⚠️ Important**: Don't use random examples! To create effective CPS signatures:
 
 1. **Capture real traffic** with Wireshark or tcpdump from the protocol you want to mimic
-2. **Extract hex patterns** from actual packet headers  
+2. **Extract hex patterns** from actual packet headers
 3. **Build CPS format** using captured hex data with `<b hex_pattern>`
 4. **Add dynamic fields** like `<c>`, `<t>`, `<r length>` as needed
 
@@ -179,21 +179,21 @@ tailscale amnezia-wg reset
 
 ## Restart Requirements
 
-| Configuration Method | Restart Required |
-|---------------------|------------------|
-| `tailscale amnezia-wg set` | Prompted (Y/n) |
-| `tailscale amnezia-wg reset` | Prompted (Y/n) |
-| `tailscale set --amnezia-wg` | No (live update) |
-| Environment variables | Yes (restart tailscaled) |
+| Configuration Method         | Restart Required         |
+| ---------------------------- | ------------------------ |
+| `tailscale amnezia-wg set`   | Prompted (Y/n)           |
+| `tailscale amnezia-wg reset` | Prompted (Y/n)           |
+| `tailscale set --amnezia-wg` | No (live update)         |
+| Environment variables        | Yes (restart tailscaled) |
 
 ## Compatibility
 
-| Peer Type | Junk Packets | Handshake Obfuscation | Protocol Masking |
-|-----------|--------------|----------------------|------------------|
-| This fork (1.5) | ✅ Supported | ✅ Supported | ✅ Supported |
-| This fork (1.0 mode) | ✅ Supported | ✅ Supported | ❌ N/A |
-| Standard Tailscale | ✅ Ignored | ❌ May fail | ❌ May fail |
-| Standard WireGuard | ✅ Ignored | ❌ May fail | ❌ May fail |
+| Peer Type            | Junk Packets | Handshake Obfuscation | Protocol Masking |
+| -------------------- | ------------ | --------------------- | ---------------- |
+| This fork (1.5)      | ✅ Supported | ✅ Supported          | ✅ Supported     |
+| This fork (1.0 mode) | ✅ Supported | ✅ Supported          | ❌ N/A           |
+| Standard Tailscale   | ✅ Ignored   | ❌ May fail           | ❌ May fail      |
+| Standard WireGuard   | ✅ Ignored   | ❌ May fail           | ❌ May fail      |
 
 ### ⚠️ Important Compatibility Notes
 

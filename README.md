@@ -52,6 +52,11 @@ Use the one-liner installer above. Manual replacement is not recommended.
 
 ## ⚡ Quick Start
 
+Note: First-time only — authenticate with Tailscale before applying Amnezia‑WG settings.
+
+- Official control plane: `tailscale up`
+- Headscale: `tailscale up --login-server https://<your-headscale-domain>`
+
 After installation, your Tailscale works exactly like before. Enable Amnezia-WG features when needed:
 
 ```bash
@@ -121,22 +126,22 @@ tailscale amnezia-wg set '{"jc":6,"s1":15,"s2":20,"i1":"<b 0xc0><r 32><c><t>","i
 
 ## 🎯 Use Cases
 
-| Scenario | Recommended Config | Compatibility |
-|----------|------------------|---------------|
-| **Basic DPI bypass** | `{"jc":4,"jmin":40,"jmax":70}` | ✅ Works with standard peers |
-| **Corporate firewall** | `{"jc":4,"i1":"<b 0xc0><r 16>"}` | ✅ Works with standard peers |
-| **Deep packet inspection** | `{"s1":10,"s2":15,"i1":"<b 0xc0><r 32><c><t>"}` | ❌ All nodes need this fork |
-| **Government censorship** | `{"jc":6,"s1":15,"s2":20,"i1":"...","i2":"..."}` | ❌ All nodes need this fork |
+| Scenario                   | Recommended Config                               | Compatibility                |
+| -------------------------- | ------------------------------------------------ | ---------------------------- |
+| **Basic DPI bypass**       | `{"jc":4,"jmin":40,"jmax":70}`                   | ✅ Works with standard peers |
+| **Corporate firewall**     | `{"jc":4,"i1":"<b 0xc0><r 16>"}`                 | ✅ Works with standard peers |
+| **Deep packet inspection** | `{"s1":10,"s2":15,"i1":"<b 0xc0><r 32><c><t>"}`  | ❌ All nodes need this fork  |
+| **Government censorship**  | `{"jc":6,"s1":15,"s2":20,"i1":"...","i2":"..."}` | ❌ All nodes need this fork  |
 
 ## 📊 Platform Support
 
-| Platform | Architecture | Status |
-|----------|-------------|---------|
-| Linux | x86_64 (amd64) | ✅ Supported |
-| Linux | ARM64 | ✅ Supported |
-| macOS | Intel (amd64) | ✅ Supported |
-| macOS | Apple Silicon (arm64) | ✅ Supported |
-| Windows | x86_64 (amd64) & ARM64 | ✅ Supported via PowerShell installer |
+| Platform | Architecture           | Status                                |
+| -------- | ---------------------- | ------------------------------------- |
+| Linux    | x86_64 (amd64)         | ✅ Supported                          |
+| Linux    | ARM64                  | ✅ Supported                          |
+| macOS    | Intel (amd64)          | ✅ Supported                          |
+| macOS    | Apple Silicon (arm64)  | ✅ Supported                          |
+| Windows  | x86_64 (amd64) & ARM64 | ✅ Supported via PowerShell installer |
 
 ## 🔄 Migration Guide
 
@@ -165,7 +170,7 @@ tailscale amnezia-wg set '{"jc":6,"s1":15,"s2":20,"i1":"<b 0xc0><r 32><c><t>","i
 
 ```bash
 export TS_AMNEZIA_JC=4
-export TS_AMNEZIA_JMIN=40 
+export TS_AMNEZIA_JMIN=40
 export TS_AMNEZIA_JMAX=70
 export TS_AMNEZIA_I1='<b 0xc0><r 32><c><t>'
 sudo systemctl restart tailscaled
