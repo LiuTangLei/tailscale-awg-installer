@@ -153,9 +153,6 @@ usage() {
 	echo "  tailscale amnezia-wg get"
 	echo "  tailscale amnezia-wg reset"
 	echo ""
-	echo "If GitHub download is slow, use mirror:"
-	echo "  curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --mirror https://your-mirror-site.com"
-	echo ""
 }
 
 main() {
