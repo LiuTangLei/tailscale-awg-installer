@@ -1,13 +1,18 @@
 # Windows-only installer (PowerShell): replace official Tailscale with Amnezia-WG-enabled binaries
 # Compatible with Windows PowerShell 5.1 and PowerShell 7+
 # Requires: Admin
+#
+# Parameters:
+#   -MirrorPrefix: Optional GitHub mirror prefix (e.g., 'https://mirror.example.com')
+#                  Will be prepended to GitHub URLs for faster downloads
 
 [CmdletBinding()]
 param(
   [string]$Repo = 'LiuTangLei/tailscale',
   [string]$Version = 'latest',
   [string]$InstallDir,
-  [switch]$EnableMsiFallback = $true
+  [switch]$EnableMsiFallback = $true,
+  [string]$MirrorPrefix = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -253,8 +258,8 @@ try {
   $ts = $rel.assets | Where-Object { $_.name -match "(?i)tailscale(?!d).*($ap).*(windows|win).*\.exe$" } | Select-Object -First 1
   $tsd = $rel.assets | Where-Object { $_.name -match "(?i)tailscaled.*($ap).*(windows|win).*\.exe$" } | Select-Object -First 1
   if ($ts -and $tsd) {
-    $tsUrl = $ts.browser_download_url
-    $tsdUrl = $tsd.browser_download_url
+    $tsUrl = if ($MirrorPrefix) { $ts.browser_download_url -replace '^https://github\.com', $MirrorPrefix + '/https://github.com' } else { $ts.browser_download_url }
+    $tsdUrl = if ($MirrorPrefix) { $tsd.browser_download_url -replace '^https://github\.com', $MirrorPrefix + '/https://github.com' } else { $tsd.browser_download_url }
     Write-Info "Resolved assets: $($ts.name), $($tsd.name)"
   }
 } catch { Write-Warn "Could not resolve assets from release: $($_.Exception.Message)" }
@@ -262,7 +267,7 @@ try {
 # Fallback to guessed URLs
 if (-not $tsUrl -or -not $tsdUrl) {
   Write-Warn 'Using fallback asset URLs'
-  $base = "https://github.com/$Repo/releases/download/$Version"
+  $base = if ($MirrorPrefix) { "$MirrorPrefix/https://github.com/$Repo/releases/download/$Version" } else { "https://github.com/$Repo/releases/download/$Version" }
   $tsUrl = "$base/tailscale-$platform.exe"
   $tsdUrl = "$base/tailscaled-$platform.exe"
 }
@@ -357,3 +362,7 @@ Write-Host '  tailscale up'
 Write-Host '  tailscale amnezia-wg set'
 Write-Host '  tailscale amnezia-wg get'
 Write-Host '  tailscale amnezia-wg reset'
+Write-Host ''
+Write-Host 'If download is slow, you can use GitHub mirror:'
+Write-Host '  iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 -OutFile install.ps1'
+Write-Host '  .\install.ps1 -MirrorPrefix "https://your-mirror-site.com"'

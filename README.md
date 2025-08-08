@@ -14,6 +14,13 @@ We provide separate, reliable installers per OS.
 - macOS: `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash`
 - Windows (PowerShell as Admin): `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 | iex`
 
+**If GitHub download is slow**: Use GitHub mirror service:
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 -OutFile install.ps1
+.\install.ps1 -MirrorPrefix 'https://your-mirror-site.com'
+```
+
 ### Manual Download
 
 Download pre-compiled binaries from [Releases](https://github.com/LiuTangLei/tailscale/releases/latest):
@@ -149,7 +156,7 @@ tailscale amnezia-wg set '{"jc":6,"s1":15,"s2":20,"i1":"<b 0xc0><r 32><c><t>","i
 
 1. Run the installer - it automatically replaces binaries
 2. Your existing configuration and authentication remain unchanged
-3. Start with conservative DPI evasion: `tailscale amnezia-wg set '{"jc":4,"jmin":40,"jmax":70}'`
+3. Start with conservative DPI evasion: `tailscale amnezia-wg set '{"jc":4,"jmin":40,"jmax":70}'` or use interactive mode
 
 ### From AmneziaWG 1.0
 
@@ -206,6 +213,14 @@ tailscaled --version
 
 # Verify Amnezia-WG support
 tailscale amnezia-wg get
+```
+
+### Windows PowerShell JSON Issues
+
+Use interactive mode for easiest configuration:
+
+```powershell
+tailscale amnezia-wg set  # Interactive setup with prompts
 ```
 
 ### Connection Problems
