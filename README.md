@@ -118,12 +118,12 @@ tailscale amnezia-wg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":
 
 ## 🎯 Configuration Guide
 
-| Configuration Type        | Parameters                                                                                                                          | Official Client Compatibility |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| **Junk packets only**     | `{"jc":4,"jmin":64,"jmax":256}`                                                                                                     | ✅ Compatible                 |
-| **Junk + signatures**     | `{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0xc0><r 16>"}`                                                                               | ✅ Compatible                 |
-| **Handshake obfuscation** | `{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777}`                                                   | ❌ Fork required              |
-| **Full obfuscation**      | `{"jc":4,"jmin":64,"jmax":256,"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777,"i1":"<b 0xc0><r 32>"}` | ❌ Fork required              |
+| Type           | Parameters                                                   | Compatibility |
+| -------------- | ------------------------------------------------------------ | ------------- |
+| **Junk only**  | `{"jc":4,"jmin":64,"jmax":256}`                              | ✅ Standard   |
+| **Junk + Sig** | `{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0xc0><r 16>"}`        | ✅ Standard   |
+| **Handshake**  | `{"s1":10,"s2":15,"h1":123456,"h2":789012}`                  | ❌ Fork only  |
+| **Full**       | `{"jc":2,"s1":10,"s2":15,"h1":123456,"i1":"<b 0xc0><r 16>"}` | ❌ Fork only  |
 
 > **Stealth Level**: Using more parameter types (jc/i1-i5/s1-s2/h1-h4) provides better obfuscation, but avoid excessive junk packets (jc) and signatures (i1-i5) to prevent bandwidth waste and latency issues.
 
