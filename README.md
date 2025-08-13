@@ -6,6 +6,8 @@
 
 Tailscale with **Amnezia-WG 1.5** protocol masquerading for DPI evasion and censorship circumvention.
 
+**📚 Languages:** [English](README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
+
 ## 🚀 Installation
 
 **Linux:**
@@ -46,8 +48,6 @@ curl -fsSL https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTan
 # Windows:
 $scriptContent = (iwr -useb https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1).Content;$scriptBlock = [scriptblock]::Create($scriptContent); & $scriptBlock -MirrorPrefix 'https://your-mirror-site.com/'
 ```
-
-You can deploy your own mirror with gh-proxy: <https://github.com/hunshcn/gh-proxy>
 
 **PowerShell execution policy issues:**
 
@@ -103,7 +103,7 @@ tailscale amnezia-wg set '{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0xc0><r 16>","i2
 
 ### Protocol Masquerading
 
-Requires ALL nodes to use this fork with identical settings:
+Requires ALL nodes to use this fork with identical settings (ix signatures do NOT require matching):
 
 ```bash
 # Handshake obfuscation (s1/s2 must match on all nodes)
@@ -112,18 +112,20 @@ tailscale amnezia-wg set '{"s1":10,"s2":15}'
 # With header fields (h1-h4 for protocol obfuscation, must match on all nodes)
 tailscale amnezia-wg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777}'
 
-# Combined with signatures
+# Combined with signatures (i1-i5 can be different per node)
 tailscale amnezia-wg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777,"i1":"<b 0xc0><r 32><c><t>"}'
 ```
 
 ## 🎯 Configuration Guide
 
-| Use Case               | Configuration                                                                                                                       | Compatibility     |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| **Basic DPI bypass**   | `{"jc":4,"jmin":64,"jmax":256}`                                                                                                     | ✅ Standard peers |
-| **Corporate firewall** | `{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0xc0><r 16>"}`                                                                               | ✅ Standard peers |
-| **Deep inspection**    | `{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777}`                                                   | ❌ Fork only      |
-| **Maximum stealth**    | `{"jc":4,"jmin":64,"jmax":256,"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777,"i1":"<b 0xc0><r 32>"}` | ❌ Fork only      |
+| Configuration Type        | Parameters                                                                                                                          | Official Client Compatibility |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| **Junk packets only**     | `{"jc":4,"jmin":64,"jmax":256}`                                                                                                     | ✅ Compatible                 |
+| **Junk + signatures**     | `{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0xc0><r 16>"}`                                                                               | ✅ Compatible                 |
+| **Handshake obfuscation** | `{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777}`                                                   | ❌ Fork required              |
+| **Full obfuscation**      | `{"jc":4,"jmin":64,"jmax":256,"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777,"i1":"<b 0xc0><r 32>"}` | ❌ Fork required              |
+
+> **Stealth Level**: Using more parameter types (jc/i1-i5/s1-s2/h1-h4) provides better obfuscation, but avoid excessive junk packets (jc) and signatures (i1-i5) to prevent bandwidth waste and latency issues.
 
 ### Parameter Explanation
 
@@ -194,26 +196,26 @@ Before each "special" handshake (every 120 seconds), the client may send up to f
 
 **CPS Format:**
 
-```
+```text
 i{n} = <tag1><tag2><tag3>...<tagN>
 ```
 
 **Tag Types:**
 
-| Tag | Format       | Description                                 | Constraints      |
-| --- | ------------ | ------------------------------------------- | ---------------- |
-| b   | <b hex_data> | Static bytes to emulate protocols           | Arbitrary length |
-| c   | <c>          | Packet counter (32-bit, network byte order) | Unique per chain |
-| t   | <t>          | Unix timestamp (32-bit, network byte order) | Unique per chain |
-| r   | <r length>   | Cryptographically secure random bytes       | length ≤ 1000    |
+| Tag | Format         | Description                                 | Constraints      |
+| --- | -------------- | ------------------------------------------- | ---------------- |
+| b   | `<b hex_data>` | Static bytes to emulate protocols           | Arbitrary length |
+| c   | `<c>`          | Packet counter (32-bit, network byte order) | Unique per chain |
+| t   | `<t>`          | Unix timestamp (32-bit, network byte order) | Unique per chain |
+| r   | `<r length>`   | Cryptographically secure random bytes       | length ≤ 1000    |
 
 **Example:**
 
-```
+```text
 i1 = <b 0xf6ab3267fa><c><b 0xf6ab><t><r 10>
 ```
 
-> ⚠️ If I1 is not set, the entire chain (I2–I5) is skipped.
+> ⚠️ If i1 is not set, the entire chain (I2–I5) is skipped.
 
 #### Capturing Real Obfuscation Packets with Wireshark
 
