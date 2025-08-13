@@ -1,254 +1,263 @@
-# Tailscale with Amnezia-WG 1.5 - One-Click Installer
+# Tailscale with Amnezia-WG 1.5
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
 [![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows-blue)](https://github.com/LiuTangLei/tailscale/releases/latest)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](LICENSE)
 
-Drop-in replacement for official Tailscale with **Amnezia-WG 1.5** protocol masquerading capabilities for advanced DPI evasion and censorship circumvention.
+Tailscale with **Amnezia-WG 1.5** protocol masquerading for DPI evasion and censorship circumvention.
 
-## 🚀 One-Click Installation
-
-We provide separate, reliable installers per OS.
-
-- Linux: `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash`
-- macOS: `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash`
-- Windows (PowerShell as Admin): `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 | iex`
-
-<sub>
-If GitHub download is slow, you can use a mirror for binary downloads<br>
-Linux: <code>curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh \| bash -s -- --mirror https://your-mirror-site.com</code><br>
-macOS: <code>curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash -s -- --mirror https://your-mirror-site.com</code><br>
-Windows: <code>iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 -OutFile install.ps1; .\install.ps1 -MirrorPrefix 'https://your-mirror-site.com'</code>
-</sub>
-
-### Manual Download
-
-Download pre-compiled binaries from [Releases](https://github.com/LiuTangLei/tailscale/releases/latest):
+## 🚀 Installation
 
 **Linux:**
 
 ```bash
-# Download and replace official binaries
-wget https://github.com/LiuTangLei/tailscale/releases/latest/download/tailscale-linux-amd64
-wget https://github.com/LiuTangLei/tailscale/releases/latest/download/tailscaled-linux-amd64
-
-sudo systemctl stop tailscaled
-sudo cp tailscale-linux-amd64 /usr/local/bin/tailscale
-sudo cp tailscaled-linux-amd64 /usr/local/bin/tailscaled
-sudo chmod +x /usr/local/bin/tailscale*
-sudo systemctl start tailscaled
+curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash
 ```
 
 **macOS:**
 
 ```bash
-# Download and replace Homebrew installation
-wget https://github.com/LiuTangLei/tailscale/releases/latest/download/tailscale-darwin-amd64
-wget https://github.com/LiuTangLei/tailscale/releases/latest/download/tailscaled-darwin-amd64
-
-sudo launchctl unload /Library/LaunchDaemons/com.tailscale.tailscaled.plist
-sudo cp tailscale-darwin-amd64 /usr/local/bin/tailscale
-sudo cp tailscaled-darwin-amd64 /usr/local/bin/tailscaled
-sudo chmod +x /usr/local/bin/tailscale*
-sudo launchctl load /Library/LaunchDaemons/com.tailscale.tailscaled.plist
+curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash
 ```
 
-**Windows:**
+**Windows (PowerShell as Admin):**
 
-Use the one-liner installer above. Manual replacement is not recommended.
+```powershell
+iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 | iex
+```
+
+### Installation Options
+
+**Mirror downloads (if GitHub is slow or blocked in your country):**
+
+It is recommended to use your own mirror domain (e.g. <https://your-mirror-site.com>) to avoid public mirrors being blocked. You can deploy your own mirror using [gh-proxy](https://github.com/hunshcn/gh-proxy).
+
+```bash
+# Linux:
+curl -fsSL https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --mirror https://your-mirror-site.com
+```
+
+```bash
+# macOS:
+curl -fsSL https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash -s -- --mirror https://your-mirror-site.com
+```
+
+```powershell
+# Windows:
+$scriptContent = (iwr -useb https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1).Content;$scriptBlock = [scriptblock]::Create($scriptContent); & $scriptBlock -MirrorPrefix 'https://your-mirror-site.com/'
+```
+
+You can deploy your own mirror with gh-proxy: <https://github.com/hunshcn/gh-proxy>
+
+**PowerShell execution policy issues:**
+
+```powershell
+# If script execution is blocked:
+Set-ExecutionPolicy RemoteSigned
+# or
+Set-ExecutionPolicy Bypass -Scope Process
+```
 
 ## ⚡ Quick Start
 
-Note: First-time only — authenticate with Tailscale before applying Amnezia‑WG settings.
-
-- Official control plane: `tailscale up`
-- Headscale: `tailscale up --login-server https://<your-headscale-domain>`
-
-After installation, your Tailscale works exactly like before. Enable Amnezia-WG features when needed:
+1. **Install** using the commands above
+2. **Login** to Tailscale:
 
 ```bash
-# Connect to your network (same as official Tailscale)
+# Official control plane
 tailscale up
 
-# Enable basic DPI evasion (safe with any Tailscale peer)
-tailscale amnezia-wg set '{"jc":4,"jmin":40,"jmax":70}'
+# Headscale users
+tailscale up --login-server https://your-headscale-domain
+```
 
-# Check current obfuscation settings
+1. **Enable obfuscation** when needed:
+
+```bash
+# Basic DPI evasion (compatible with any peer)
+tailscale amnezia-wg set '{"jc":4,"jmin":64,"jmax":256}'
+
+# Check current settings
 tailscale amnezia-wg get
 
-# Interactive setup with guidance
+# Interactive setup
 tailscale amnezia-wg set
 
 # Reset to standard WireGuard
 tailscale amnezia-wg reset
 ```
 
-## 🛡️ Amnezia-WG 1.5 Features
+## 🛡️ Amnezia-WG Features
+
+### Junk Traffic & Signatures
+
+Add fake packets and protocol signatures to evade DPI. Compatible with standard Tailscale peers:
+
+```bash
+# Basic junk traffic
+tailscale amnezia-wg set '{"jc":4,"jmin":64,"jmax":256}'
+
+# With protocol signatures (i1-i5)
+tailscale amnezia-wg set '{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0xc0><r 16>","i2":"<b 0x40><r 12>"}'
+```
 
 ### Protocol Masquerading
 
-Make your WireGuard traffic look like any UDP protocol (QUIC, DNS, SIP):
+Requires ALL nodes to use this fork with identical settings:
 
 ```bash
-tailscale amnezia-wg set '{"s1":10,"s2":15,"i1":"<b 0xc0><r 32><c><t>"}'
+# Handshake obfuscation (s1/s2 must match on all nodes)
+tailscale amnezia-wg set '{"s1":10,"s2":15}'
+
+# With header fields (h1-h4 for protocol obfuscation, must match on all nodes)
+tailscale amnezia-wg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777}'
+
+# Combined with signatures
+tailscale amnezia-wg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777,"i1":"<b 0xc0><r 32><c><t>"}'
 ```
 
-### Advanced Junk Traffic
+## 🎯 Configuration Guide
 
-Smart packet injection that doesn't interfere with standard peers:
+| Use Case               | Configuration                                                                                                                       | Compatibility     |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| **Basic DPI bypass**   | `{"jc":4,"jmin":64,"jmax":256}`                                                                                                     | ✅ Standard peers |
+| **Corporate firewall** | `{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0xc0><r 16>"}`                                                                               | ✅ Standard peers |
+| **Deep inspection**    | `{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777}`                                                   | ❌ Fork only      |
+| **Maximum stealth**    | `{"jc":4,"jmin":64,"jmax":256,"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777,"i1":"<b 0xc0><r 32>"}` | ❌ Fork only      |
 
-```bash
-tailscale amnezia-wg set '{"jc":4,"jmin":40,"jmax":70,"i1":"<b 0xc0><r 16>"}'
-```
+### Parameter Explanation
 
-### Multi-Level Obfuscation
+- **jc**: Number of junk packets (0-10, must set jmin/jmax together)
+- **jmin/jmax**: Junk packet size range in bytes (64-1024, required when using jc)
+- **i1-i5**: Protocol signature packets for imitation (arbitrary hex-blob)
+- **s1/s2**: Random prefixes for Init/Response packets (0-64 bytes, requires matching values on all nodes)
+- **h1-h4**: Protocol obfuscation (32-bit values, must set all 4 or none, requires matching values on all nodes)
 
-Combine multiple techniques for maximum stealth:
+### Official Parameter Ranges
 
-```bash
-tailscale amnezia-wg set '{"jc":2,"s1":15,"s2":20,"i1":"<b 0xc0><r 16>","i2":"<b 0x40><r 12>"}'
-```
-
-## 🔧 Configuration Examples
-
-### Conservative (Works with standard Tailscale peers)
-
-```bash
-# Basic junk packets - each node can use different values
-tailscale amnezia-wg set '{"jc":4,"jmin":40,"jmax":70}'
-
-# With protocol signatures - still compatible
-tailscale amnezia-wg set '{"jc":2,"i1":"<b 0xc0><r 16>","i2":"<b 0x40><r 12>"}'
-```
-
-### Advanced (All nodes must use this fork)
-
-```bash
-# Protocol masquerading - requires identical s1/s2 on all nodes
-tailscale amnezia-wg set '{"s1":10,"s2":15,"i1":"<b 0xc0><r 32><c><t>"}'
-
-# Maximum obfuscation - complex signature chain
-tailscale amnezia-wg set '{"jc":6,"s1":15,"s2":20,"i1":"<b 0xc0><r 32><c><t>","i2":"<b 0x40><r 16><t>"}'
-```
-
-## 🎯 Use Cases
-
-| Scenario                   | Recommended Config                               | Compatibility                |
-| -------------------------- | ------------------------------------------------ | ---------------------------- |
-| **Basic DPI bypass**       | `{"jc":4,"jmin":40,"jmax":70}`                   | ✅ Works with standard peers |
-| **Corporate firewall**     | `{"jc":4,"i1":"<b 0xc0><r 16>"}`                 | ✅ Works with standard peers |
-| **Deep packet inspection** | `{"s1":10,"s2":15,"i1":"<b 0xc0><r 32><c><t>"}`  | ❌ All nodes need this fork  |
-| **Government censorship**  | `{"jc":6,"s1":15,"s2":20,"i1":"...","i2":"..."}` | ❌ All nodes need this fork  |
+| Parameter      | Range              | Description                               |
+| -------------- | ------------------ | ----------------------------------------- |
+| **I1-I5**      | arbitrary hex-blob | Signature packets for protocol imitation  |
+| **S1, S2**     | 0-64 bytes         | Random prefixes for Init/Response packets |
+| **Jc**         | 0-10               | Number of junk packets following I1-I5    |
+| **Jmin, Jmax** | 64-1024 bytes      | Size range for random junk packets        |
+| **H1-H4**      | 0-4294967295       | 32-bit values for protocol obfuscation    |
 
 ## 📊 Platform Support
 
-| Platform | Architecture           | Status                                |
-| -------- | ---------------------- | ------------------------------------- |
-| Linux    | x86_64 (amd64)         | ✅ Supported                          |
-| Linux    | ARM64                  | ✅ Supported                          |
-| macOS    | Intel (amd64)          | ✅ Supported                          |
-| macOS    | Apple Silicon (arm64)  | ✅ Supported                          |
-| Windows  | x86_64 (amd64) & ARM64 | ✅ Supported via PowerShell installer |
+| Platform    | Architectures        | Status                  |
+| ----------- | -------------------- | ----------------------- |
+| **Linux**   | x86_64, ARM64        | ✅ Fully supported      |
+| **macOS**   | Intel, Apple Silicon | ✅ Fully supported      |
+| **Windows** | x86_64, ARM64        | ✅ PowerShell installer |
 
-## 🔄 Migration Guide
+## 🔄 Migration from Official Tailscale
 
-### From Official Tailscale
-
-1. Run the installer - it automatically replaces binaries
-2. Your existing configuration and authentication remain unchanged
-3. Start with conservative DPI evasion: `tailscale amnezia-wg set '{"jc":4,"jmin":40,"jmax":70}'` or use interactive mode
-
-### From AmneziaWG 1.0
-
-1. Replace compile-time settings with runtime configuration
-2. H1–H4 still exist in 1.5 but are internal/auto-generated; configure CPS via I1–I5 instead (no manual H1–H4 knobs)
-3. Use interactive setup: `tailscale amnezia-wg set`
+1. Run the installer - automatically replaces binaries while preserving your settings
+2. Your existing authentication and configuration remain unchanged
+3. Start with basic obfuscation: `tailscale amnezia-wg set '{"jc":4,"jmin":64,"jmax":256}'`
 
 ## ⚠️ Important Notes
 
-- **Default Behavior**: Works exactly like official Tailscale until you enable obfuscation
-- **Mixed Networks**: Junk packets (`jc`) and signatures (`i1`-`i5`) work with any peer
-- **Protocol Masquerading**: Handshake obfuscation (`s1`, `s2`) requires ALL nodes to use this fork
-- **Performance**: Minimal overhead with conservative settings, monitor bandwidth with complex signatures
+- **Default behavior**: Works exactly like official Tailscale until you enable obfuscation
+- **Junk packets (jc) & signatures (i1-i5)**: Compatible with any Tailscale peer, including standard clients. Each node can use different values
+- **Protocol masquerading (s1/s2) & header fields (h1-h4)**: Requires ALL nodes to use this fork with identical values
+- **Performance**: Minimal overhead with basic settings
 
 ## 🛠️ Advanced Usage
 
-### Environment Variables
+### Header Field Configuration (h1-h4)
+
+Protocol obfuscation to evade WireGuard detection. Must set all 4 values or none:
 
 ```bash
-export TS_AMNEZIA_JC=4
-export TS_AMNEZIA_JMIN=40
-export TS_AMNEZIA_JMAX=70
-export TS_AMNEZIA_I1='<b 0xc0><r 32><c><t>'
-sudo systemctl restart tailscaled
+# First node: generate random values (enter 'random' for each h1-h4)
+tailscale amnezia-wg set  # Set all h1, h2, h3, h4 when prompted
+
+# Get the configuration JSON
+tailscale amnezia-wg get
+
+# Copy the entire JSON to other nodes (must include all h1-h4)
+tailscale amnezia-wg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777}'
 ```
 
-### JSON Configuration
+### Creating Protocol Signatures
 
-```bash
-# Set via general command
-tailscale set --amnezia-wg='{"jc":4,"jmin":40,"jmax":70}'
+1. Capture real traffic with Wireshark
+2. Extract hex patterns from headers
+3. Build format: `<b 0xHEX>` (static), `<r LENGTH>` (random), `<c>` (counter), `<t>` (timestamp)
+4. Example: `<b 0xc0000000><r 16><c><t>` = QUIC-like header + 16 random bytes + counter + timestamp
 
-# Batch configuration
-tailscale amnezia-wg set '{"jc":4,"s1":10,"s2":15,"i1":"<captured_protocol_header>"}'
+### Obfuscation Packets I1–I5 (Signature Chain) & CPS (Custom Protocol Signature)
+
+Before each "special" handshake (every 120 seconds), the client may send up to five custom UDP packets (I1–I5) in the CPS format for protocol imitation.
+
+**CPS Format:**
+
+```
+i{n} = <tag1><tag2><tag3>...<tagN>
 ```
 
-### Creating Custom Protocol Signatures
+**Tag Types:**
 
-1. **Capture real traffic** with Wireshark from the protocol you want to mimic
-2. **Extract hex patterns** from packet headers
-3. **Build CPS format**: `<b 0xHEX_PATTERN>` for static headers
-4. **Add dynamics**: `<c>` (counter), `<t>` (timestamp), `<r LENGTH>` (random)
+| Tag | Format       | Description                                 | Constraints      |
+| --- | ------------ | ------------------------------------------- | ---------------- |
+| b   | <b hex_data> | Static bytes to emulate protocols           | Arbitrary length |
+| c   | <c>          | Packet counter (32-bit, network byte order) | Unique per chain |
+| t   | <t>          | Unix timestamp (32-bit, network byte order) | Unique per chain |
+| r   | <r length>   | Cryptographically secure random bytes       | length ≤ 1000    |
 
-Example: `<b 0xc0000000><r 16><c><t>` = QUIC-like header + 16 random bytes + counter + timestamp
+**Example:**
+
+```
+i1 = <b 0xf6ab3267fa><c><b 0xf6ab><t><r 10>
+```
+
+> ⚠️ If I1 is not set, the entire chain (I2–I5) is skipped.
+
+#### Capturing Real Obfuscation Packets with Wireshark
+
+1. Start Amnezia-WG and configure the i1–i5 parameters
+2. Use Wireshark to monitor the UDP port (e.g., filter: `udp.port == 51820`)
+3. Observe and analyze the obfuscation packets, extract protocol signatures as needed
+
+For more details, see the [Amnezia-WG official documentation](https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted)
 
 ## 🐛 Troubleshooting
 
-### Installation Issues
+### Verify Installation
 
 ```bash
-# Check if installation worked
-tailscale version
-tailscaled --version
-
-# Verify Amnezia-WG support
-tailscale amnezia-wg get
+tailscale version          # Check client version
+tailscale amnezia-wg get   # Verify Amnezia-WG support
 ```
 
-### Windows PowerShell JSON Issues
-
-Use interactive mode for easiest configuration:
-
-```powershell
-tailscale amnezia-wg set  # Interactive setup with prompts
-```
-
-### Connection Problems
+### Connection Issues
 
 ```bash
 # Reset to standard WireGuard
 tailscale amnezia-wg reset
 
-# Check logs
-sudo journalctl -u tailscaled -f
+# Try basic settings first
+tailscale amnezia-wg set '{"jc":2,"jmin":64,"jmax":128}'
 
-# Try conservative settings first
-tailscale amnezia-wg set '{"jc":2,"jmin":40,"jmax":60}'
+# Check logs (Linux)
+sudo journalctl -u tailscaled -f
 ```
 
-### Configuration Issues
+### Windows PowerShell Issues
 
-- **Mixed networks**: Only use `jc`, `jmin`, `jmax`, `i1`-`i5` with standard peers
-- **Protocol masquerading**: Ensure ALL nodes have identical `s1`, `s2` values
-- **Long signatures**: Use JSON mode for signatures >1000 characters
+Use interactive mode to avoid JSON escaping problems:
 
-## 🤝 Contributing
+```powershell
+tailscale amnezia-wg set  # Interactive setup
+```
 
-This is a fork of [Tailscale](https://github.com/tailscale/tailscale) with integrated [Amnezia-WG 1.5](https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted) protocol masquerading.
+## 🤝 Links & Support
 
-- **Report issues (installer scripts)**: [GitHub Issues](https://github.com/LiuTangLei/tailscale-awg-installer/issues)
-- **Core fork source code**: [GitHub Repository](https://github.com/LiuTangLei/tailscale)
-- **Official docs**: [Amnezia-WG Documentation](https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted)
+- **Binary releases**: [LiuTangLei/tailscale](https://github.com/LiuTangLei/tailscale/releases)
+- **Installer issues**: [GitHub Issues](https://github.com/LiuTangLei/tailscale-awg-installer/issues)
+- **Amnezia-WG docs**: [Official Documentation](https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted)
 
 ## 📄 License
 
@@ -256,4 +265,4 @@ BSD 3-Clause License (same as Tailscale)
 
 ---
 
-**⚠️ Disclaimer**: This software is for educational and legitimate privacy purposes only. Users are responsible for compliance with applicable laws and regulations.
+**⚠️ Disclaimer**: For educational and legitimate privacy purposes only. Users are responsible for compliance with applicable laws.
