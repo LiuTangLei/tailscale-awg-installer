@@ -118,12 +118,19 @@ tailscale amnezia-wg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":
 
 ## 🎯 Configuration Guide
 
-| Type           | Parameters                                                   | Compatibility |
-| -------------- | ------------------------------------------------------------ | ------------- |
-| **Junk only**  | `{"jc":4,"jmin":64,"jmax":256}`                              | ✅ Standard   |
-| **Junk + Sig** | `{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0xc0><r 16>"}`        | ✅ Standard   |
-| **Handshake**  | `{"s1":10,"s2":15,"h1":123456,"h2":789012}`                  | ❌ Fork only  |
-| **Full**       | `{"jc":2,"s1":10,"s2":15,"h1":123456,"i1":"<b 0xc0><r 16>"}` | ❌ Fork only  |
+**Basic Configurations (Compatible with standard clients):**
+
+| Type           | Config                                                | Status      |
+| -------------- | ----------------------------------------------------- | ----------- |
+| **Junk only**  | `{"jc":4,"jmin":64,"jmax":256}`                       | ✅ Standard |
+| **Junk + Sig** | `{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0xc0><r 16>"}` | ✅ Standard |
+
+**Advanced Configurations (Requires this fork on ALL nodes):**
+
+| Type          | Config                                                                                           | Status       |
+| ------------- | ------------------------------------------------------------------------------------------------ | ------------ |
+| **Handshake** | `{"s1":10,"s2":15,"h1":123456,"h2":789012,"h3":345678,"h4":901234}`                              | ❌ Fork only |
+| **Full**      | `{"jc":2,"s1":10,"s2":15,"h1":123456,"h2":789012,"h3":345678,"h4":901234,"i1":"<b 0xc0><r 16>"}` | ❌ Fork only |
 
 > **Stealth Level**: Using more parameter types (jc/i1-i5/s1-s2/h1-h4) provides better obfuscation, but avoid excessive junk packets (jc) and signatures (i1-i5) to prevent bandwidth waste and latency issues.
 
