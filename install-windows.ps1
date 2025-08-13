@@ -362,6 +362,28 @@ if ($svc) {
 }
 #endregion
 
+#region Launch GUI
+Write-Info 'Launching Tailscale GUI client (if available)...'
+$ipnPath = "$defaultDir\tailscale-ipn.exe"
+if (Test-Path $ipnPath) {
+  $outFile = $null
+  $errFile = $null
+  try {
+    $outFile = [System.IO.Path]::GetTempFileName()
+    $errFile = [System.IO.Path]::GetTempFileName()
+    Start-Process -FilePath $ipnPath -WindowStyle Hidden -RedirectStandardOutput $outFile -RedirectStandardError $errFile -ErrorAction Stop
+    Write-Ok 'Tailscale GUI launched'
+  } catch {
+    Write-Warn "Failed to launch GUI: $($_.Exception.Message)"
+  } finally {
+    if ($outFile -and (Test-Path $outFile)) { Remove-Item -Path $outFile -Force -ErrorAction SilentlyContinue }
+    if ($errFile -and (Test-Path $errFile)) { Remove-Item -Path $errFile -Force -ErrorAction SilentlyContinue }
+  }
+} else {
+  Write-Warn 'Tailscale GUI (tailscale-ipn.exe) not found; skipping launch'
+}
+#endregion
+
 Write-Host ''
 Write-Host 'Quick Start:'
 Write-Host '  tailscale up'
