@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Linux-only installer: replace official Tailscale with Amnezia-WG-enabled binaries
-# Reliable, minimal dependencies. Requires systemd for service management.
+# Supports major Linux distributions (Debian/Ubuntu, RHEL/CentOS/Fedora, Arch Linux, SUSE/openSUSE)
+# Includes package hold functionality to prevent official updates from overriding custom binaries
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash
@@ -10,8 +11,10 @@
 set -euo pipefail
 
 REPO="LiuTangLei/tailscale"
-VERSION="latest" # Always use latest release
-MIRROR_PREFIX="" # GitHub mirror prefix
+VERSION="latest"   # Always use latest release
+MIRROR_PREFIX=""   # GitHub mirror prefix
+DISTRO=""          # Will be detected automatically
+PACKAGE_MANAGER="" # Will be detected automatically
 
 # Colors for output
 RED='\033[0;31m'
@@ -24,6 +27,178 @@ log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_ok() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_err() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+# Detect Linux distribution and package manager
+detect_distro() {
+	if [[ -f /etc/os-release ]]; then
+		# shellcheck source=/dev/null
+		source /etc/os-release
+		case "${ID-}" in
+		ubuntu | debian | linuxmint | elementary | zorin)
+			DISTRO="debian"
+			PACKAGE_MANAGER="apt"
+			;;
+		fedora | rhel | centos | rocky | almalinux | ol)
+			DISTRO="redhat"
+			PACKAGE_MANAGER="dnf"
+			# For older RHEL/CentOS versions
+			if ! command -v dnf >/dev/null 2>&1; then
+				PACKAGE_MANAGER="yum"
+			fi
+			;;
+		arch | manjaro | endeavouros)
+			DISTRO="arch"
+			PACKAGE_MANAGER="pacman"
+			;;
+		opensuse* | sles)
+			DISTRO="suse"
+			PACKAGE_MANAGER="zypper"
+			;;
+		alpine)
+			DISTRO="alpine"
+			PACKAGE_MANAGER="apk"
+			;;
+		*)
+			log_warn "Unknown distribution: ${ID:-unknown}"
+			DISTRO="unknown"
+			PACKAGE_MANAGER=""
+			;;
+		esac
+	else
+		log_warn "Cannot detect distribution (/etc/os-release not found)"
+		DISTRO="unknown"
+		PACKAGE_MANAGER=""
+	fi
+
+	log_info "Detected distribution: ${DISTRO}"
+	if [[ -n ${PACKAGE_MANAGER} ]]; then
+		log_info "Package manager: ${PACKAGE_MANAGER}"
+	fi
+}
+
+# Install official Tailscale using distribution-specific method
+install_official_tailscale() {
+	case "${DISTRO}" in
+	debian)
+		log_info "Installing Tailscale via APT repository..."
+		curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.noarmor.gpg | ${SUDO} tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+		curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.list | ${SUDO} tee /etc/apt/sources.list.d/tailscale.list
+		${SUDO} apt update
+		${SUDO} apt install -y tailscale
+		;;
+	redhat)
+		log_info "Installing Tailscale via ${PACKAGE_MANAGER}..."
+		${SUDO} "${PACKAGE_MANAGER}" config-manager --add-repo https://pkgs.tailscale.com/stable/rhel/tailscale.repo || {
+			# Fallback for older versions
+			curl -fsSL https://pkgs.tailscale.com/stable/rhel/repo.gpg | ${SUDO} tee /etc/pki/rpm-gpg/RPM-GPG-KEY-tailscale >/dev/null
+			cat <<EOF | ${SUDO} tee /etc/yum.repos.d/tailscale.repo
+[tailscale-stable]
+name=Tailscale stable
+baseurl=https://pkgs.tailscale.com/stable/rhel/\$basearch
+enabled=1
+type=rpm
+repo_gpgcheck=1
+gpgcheck=0
+gpgkey=https://pkgs.tailscale.com/stable/rhel/repo.gpg
+EOF
+		}
+		${SUDO} "${PACKAGE_MANAGER}" install -y tailscale
+		;;
+	arch)
+		log_info "Installing Tailscale from AUR..."
+		if command -v yay >/dev/null 2>&1; then
+			yay -S --noconfirm tailscale
+		elif command -v paru >/dev/null 2>&1; then
+			paru -S --noconfirm tailscale
+		else
+			log_warn "No AUR helper found. Please install tailscale manually or install yay/paru"
+			# Fallback: install from official script
+			curl -fsSL https://tailscale.com/install.sh | sh
+		fi
+		;;
+	suse)
+		log_info "Installing Tailscale via zypper..."
+		${SUDO} rpm --import https://pkgs.tailscale.com/stable/sles/repo.gpg
+		${SUDO} zypper addrepo --gpgcheck --type rpm https://pkgs.tailscale.com/stable/sles/tailscale.repo
+		${SUDO} zypper refresh
+		${SUDO} zypper install -y tailscale
+		;;
+	alpine)
+		log_info "Installing Tailscale via apk..."
+		# Alpine Linux has Tailscale in community repository
+		${SUDO} apk add --update tailscale
+		;;
+	*)
+		log_warn "Unknown distribution, falling back to official install script..."
+		curl -fsSL https://tailscale.com/install.sh | sh
+		;;
+	esac
+}
+
+# Hold package to prevent updates (distribution-specific)
+hold_package() {
+	log_info "Preventing Tailscale package updates..."
+	case "${DISTRO}" in
+	debian)
+		${SUDO} apt-mark hold tailscale 2>/dev/null || true
+		log_ok "Tailscale package held (apt-mark)"
+		;;
+	redhat)
+		if command -v dnf >/dev/null 2>&1; then
+			${SUDO} dnf versionlock add tailscale 2>/dev/null || true
+			log_ok "Tailscale package locked (dnf versionlock)"
+		elif command -v yum >/dev/null 2>&1; then
+			${SUDO} yum versionlock add tailscale 2>/dev/null || {
+				log_warn "yum-plugin-versionlock not installed. Please install it to prevent updates"
+			}
+		fi
+		;;
+	arch)
+		# Add to IgnorePkg in pacman.conf
+		if ! grep -q "^IgnorePkg.*tailscale" /etc/pacman.conf 2>/dev/null; then
+			${SUDO} sed -i '/^#IgnorePkg/s/^#//' /etc/pacman.conf 2>/dev/null || true
+			if grep -q "^IgnorePkg" /etc/pacman.conf 2>/dev/null; then
+				${SUDO} sed -i '/^IgnorePkg/s/$/ tailscale/' /etc/pacman.conf
+			else
+				echo "IgnorePkg = tailscale" | ${SUDO} tee -a /etc/pacman.conf >/dev/null
+			fi
+			log_ok "Tailscale added to IgnorePkg (pacman.conf)"
+		fi
+		;;
+	suse)
+		${SUDO} zypper addlock tailscale 2>/dev/null || true
+		log_ok "Tailscale package locked (zypper lock)"
+		;;
+	alpine)
+		log_warn "Alpine Linux doesn't have built-in package hold. Consider using package masks."
+		;;
+	*)
+		log_warn "Cannot hold package updates for unknown distribution"
+		;;
+	esac
+}
+
+# Release package hold (for uninstalling or manual updates)
+release_package() {
+	case "${DISTRO}" in
+	debian)
+		${SUDO} apt-mark unhold tailscale 2>/dev/null || true
+		;;
+	redhat)
+		if command -v dnf >/dev/null 2>&1; then
+			${SUDO} dnf versionlock delete tailscale 2>/dev/null || true
+		elif command -v yum >/dev/null 2>&1; then
+			${SUDO} yum versionlock delete tailscale 2>/dev/null || true
+		fi
+		;;
+	arch)
+		${SUDO} sed -i '/^IgnorePkg.*tailscale/s/ tailscale//' /etc/pacman.conf 2>/dev/null || true
+		;;
+	suse)
+		${SUDO} zypper removelock tailscale 2>/dev/null || true
+		;;
+	esac
+}
 
 check_root() {
 	if [[ ${EUID} -eq 0 ]]; then SUDO=""; else SUDO="sudo"; fi
@@ -87,7 +262,7 @@ start_service() {
 install_official_if_missing() {
 	if ! command -v tailscale >/dev/null 2>&1; then
 		log_warn "Tailscale not found. Installing official version first..."
-		curl -fsSL https://tailscale.com/install.sh | sh
+		install_official_tailscale
 		log_ok "Official Tailscale installed"
 	else
 		log_info "Tailscale found; will replace binaries"
@@ -145,6 +320,8 @@ install_binaries() {
 
 usage() {
 	echo ""
+	echo "🎉 Installation completed!"
+	echo ""
 	echo "Quick Start:"
 	echo "  tailscale up"
 	echo ""
@@ -166,12 +343,36 @@ main() {
 			log_info "Using mirror: ${MIRROR_PREFIX}"
 			shift 2
 			;;
+		--no-hold)
+			NO_HOLD=true
+			log_info "Package hold disabled"
+			shift
+			;;
+		--release-hold)
+			detect_distro
+			check_root
+			release_package
+			log_ok "Package hold released"
+			exit 0
+			;;
 		--help | -h)
-			echo "Usage: $0 [--mirror PREFIX]"
-			echo "  --mirror PREFIX  Use GitHub mirror with specified prefix"
+			echo "Usage: $0 [OPTIONS]"
 			echo ""
-			echo "Example with mirror:"
+			echo "Options:"
+			echo "  --mirror PREFIX     Use GitHub mirror with specified prefix"
+			echo "  --no-hold          Don't hold package to prevent updates"
+			echo "  --release-hold     Release package hold and exit"
+			echo "  --help, -h         Show this help"
+			echo ""
+			echo "Examples:"
+			echo "  # Install with mirror:"
 			echo "  curl -fsSL URL | bash -s -- --mirror https://your-mirror-site.com"
+			echo ""
+			echo "  # Install without package hold:"
+			echo "  curl -fsSL URL | bash -s -- --no-hold"
+			echo ""
+			echo "  # Release package hold:"
+			echo "  curl -fsSL URL | bash -s -- --release-hold"
 			exit 0
 			;;
 		*)
@@ -181,9 +382,16 @@ main() {
 		esac
 	done
 
+	detect_distro
 	check_root
 	install_official_if_missing
 	install_binaries
+
+	# Hold package updates unless explicitly disabled
+	if [[ ${NO_HOLD:-false} != true ]]; then
+		hold_package
+	fi
+
 	start_service
 	usage
 }
