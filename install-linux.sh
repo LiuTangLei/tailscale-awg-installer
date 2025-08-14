@@ -12,6 +12,41 @@ readonly INSTALL_DIR="/usr/local/bin"
 readonly R='\033[31m' G='\033[32m' Y='\033[33m' B='\033[34m' N='\033[0m'
 log() { echo -e "${!1}[${1}]${N} $2"; }
 
+# Small helpers
+has_cmd() { command -v "$1" &>/dev/null; }
+systemd_available() { has_cmd systemctl; }
+has_unit() { systemd_available && systemctl list-unit-files 2>/dev/null | grep -q "^$1"; }
+
+# Write minimal/fallback systemd unit (idempotent overwrite)
+write_minimal_unit() {
+	local td_bin="$1"
+	cat <<UNIT | ${SUDO} tee /etc/systemd/system/tailscaled.service >/dev/null
+[Unit]
+Description=Tailscale node agent (fallback minimal unit)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=${td_bin} --state=/var/lib/tailscale/tailscaled.state
+Restart=on-failure
+RuntimeDirectory=tailscale
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_SYS_MODULE
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_SYS_MODULE
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+	${SUDO} systemctl daemon-reload || true
+}
+
+stop_disable_tailscaled() {
+	systemd_available || return 0
+	has_unit tailscaled.service || return 0
+	systemctl is-active --quiet tailscaled 2>/dev/null && ${SUDO} systemctl stop tailscaled || true
+	${SUDO} systemctl disable tailscaled &>/dev/null || true
+}
+
 # Global variables
 DISTRO="" PACKAGE_MANAGER="" SUDO="" RELEASE_TAG="latest" MIRROR_PREFIX="" FALLBACK_BINARY=false ACTION="install"
 TMP_DIRS=()
@@ -158,17 +193,14 @@ install_binaries() {
 
 	tmp_dir=$(mktemp -d)
 	TMP_DIRS+=("${tmp_dir}")
-
 	log B "Downloading Amnezia-WG binaries..."
 	smart_download "${base_url}/tailscale-${platform}" "${tmp_dir}/tailscale" &&
-		smart_download "${base_url}/tailscaled-${platform}" "${tmp_dir}/tailscaled" ||
-		{
-			log R "Download failed"
-			exit 1
-		}
+		smart_download "${base_url}/tailscaled-${platform}" "${tmp_dir}/tailscaled" || {
+		log R "Download failed"
+		exit 1
+	}
 
-	# Verify files: non-empty + ELF magic
-	local ok=true
+	local ok=true f
 	for f in tailscale tailscaled; do
 		if [[ ! -s "${tmp_dir}/${f}" ]]; then
 			log R "File ${f} empty"
@@ -177,23 +209,21 @@ install_binaries() {
 			log R "File ${f} not ELF"
 			ok=false
 		fi
-		# Basic permission set before install
 		chmod 755 "${tmp_dir}/${f}" 2>/dev/null || true
 	done
-	if [[ ${ok} == false ]]; then
+	[[ ${ok} == false ]] && {
 		log R "Binary validation failed"
 		exit 1
-	fi
+	}
 
-	# Stop service and install
-	systemctl is-active --quiet tailscaled 2>/dev/null && ${SUDO} systemctl stop tailscaled || true
+	# Stop running service if active (quieter helper)
+	stop_disable_tailscaled || true
 
+	# Determine existing paths (prefer existing commands for atomic replacement)
 	local ts_path td_path
 	ts_path=$(command -v tailscale || echo "${INSTALL_DIR}/tailscale")
 	td_path=$(command -v tailscaled || echo "${INSTALL_DIR}/tailscaled")
-
-	# Use systemd path if available
-	if command -v systemctl &>/dev/null; then
+	if systemd_available; then
 		local exec_start
 		exec_start=$(systemctl show -p ExecStart tailscaled 2>/dev/null | sed -E 's/^ExecStart=\??([^ ]+).*/\1/' || true)
 		[[ -n ${exec_start} && -x ${exec_start} ]] && td_path="${exec_start}"
@@ -202,33 +232,12 @@ install_binaries() {
 	${SUDO} mkdir -p "$(dirname "${ts_path}")" "$(dirname "${td_path}")"
 	${SUDO} install -m 755 "${tmp_dir}/tailscale" "${ts_path}"
 	${SUDO} install -m 755 "${tmp_dir}/tailscaled" "${td_path}"
-
 	log G "Binaries installed: ${ts_path}, ${td_path}"
 
-	# If we had no official install (fallback) and no systemd unit, create a minimal one
-	if [[ ${FALLBACK_BINARY} == true ]] && command -v systemctl &>/dev/null; then
-		if ! systemctl list-unit-files | grep -q '^tailscaled\.service'; then
-			log Y "Creating minimal systemd unit for tailscaled (fallback)"
-			# Use discovered td_path instead of hardcoding
-			cat <<UNIT | ${SUDO} tee /etc/systemd/system/tailscaled.service >/dev/null
-[Unit]
-Description=Tailscale node agent (fallback minimal unit)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-ExecStart=${td_path} --state=/var/lib/tailscale/tailscaled.state
-Restart=on-failure
-RuntimeDirectory=tailscale
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_SYS_MODULE
-AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_SYS_MODULE
-LimitNOFILE=1048576
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-			${SUDO} systemctl daemon-reload || true
-		fi
+	# Fallback unit creation if no official unit existed and we came here due to binary fallback path
+	if [[ ${FALLBACK_BINARY} == true ]] && systemd_available && ! has_unit tailscaled.service; then
+		log Y "Creating minimal systemd unit for tailscaled (fallback)"
+		write_minimal_unit "${td_path}"
 	fi
 }
 
@@ -236,16 +245,8 @@ UNIT
 uninstall_all() {
 	log Y "Uninstalling Tailscale (packages, binaries, config, state)..."
 
-	detect_system
-
-	# Stop service if running
-	if command -v systemctl &>/dev/null; then
-		if systemctl list-unit-files | grep -q '^tailscaled\.service'; then
-			systemctl is-active --quiet tailscaled 2>/dev/null && ${SUDO} systemctl stop tailscaled || true
-			${SUDO} systemctl disable tailscaled &>/dev/null || true
-			log G "Service tailscaled stopped/disabled"
-		fi
-	fi
+	# Stop & disable if present
+	stop_disable_tailscaled && log G "Service tailscaled stopped/disabled" || true
 
 	# tailscale logout (ignore errors)
 	if command -v tailscale &>/dev/null; then
@@ -312,6 +313,60 @@ uninstall_all() {
 	echo -e "\nIf you had iptables/routes modifications manually, review them. Reboot recommended for full cleanup of kernel modules (if any)."
 }
 
+# Ensure required runtime/state directories exist (some minimal Debian/containers may not have them recreated automatically)
+ensure_dirs() {
+	${SUDO} mkdir -p /var/lib/tailscale /var/run/tailscale /run/tailscale 2>/dev/null || true
+	${SUDO} chmod 700 /var/lib/tailscale 2>/dev/null || true
+}
+
+# Health check with retries for tailscaled service / socket
+health_check_tailscaled() {
+	local attempts=0 max=8
+	while ((attempts < max)); do
+		# Active?
+		if command -v systemctl &>/dev/null; then
+			if systemctl is-active --quiet tailscaled 2>/dev/null; then
+				# Socket responding?
+				if command -v tailscale &>/dev/null; then
+					tailscale status >/dev/null 2>&1 && return 0
+				fi
+				# If daemon active but tailscale client not yet ready, small sleep
+			fi
+		fi
+		[[ -S /var/run/tailscale/tailscaled.sock || -S /run/tailscale/tailscaled.sock ]] && return 0
+		sleep 1
+		attempts=$((attempts + 1))
+	done
+	return 1
+}
+
+start_tailscaled_with_fallback() {
+	systemd_available || return 0
+	ensure_dirs
+	${SUDO} systemctl enable --now tailscaled &>/dev/null || true
+	if health_check_tailscaled; then
+		log G "Service started and enabled"
+		return 0
+	fi
+	log Y "Service not healthy after initial start; attempting fallback minimal unit"
+	if has_cmd tailscaled; then
+		local td_bin
+		td_bin="$(command -v tailscaled)"
+		write_minimal_unit "${td_bin}"
+		${SUDO} systemctl restart tailscaled || true
+		if health_check_tailscaled; then
+			log G "Fallback unit started successfully"
+			return 0
+		fi
+		log R "Fallback unit still unhealthy; collecting diagnostics"
+		local DIAG_LOG
+		DIAG_LOG=$(mktemp /tmp/tailscaled-diag-XXXX.log)
+		TMP_DIRS+=("$(dirname "${DIAG_LOG}")")
+		(timeout 5s "${SUDO}" "${td_bin}" --state=/var/lib/tailscale/tailscaled.state 2>&1 | tee "${DIAG_LOG}" >/dev/null) || true
+		log R "Diagnostics captured in ${DIAG_LOG}"
+	fi
+}
+
 # Main installation process
 main() {
 	echo "🔧 Tailscale Amnezia-WG Installer"
@@ -373,8 +428,46 @@ EOF
 
 	# Start service
 	if command -v systemctl &>/dev/null; then
+		ensure_dirs
 		${SUDO} systemctl enable --now tailscaled &>/dev/null || true
-		log G "Service started and enabled"
+		if health_check_tailscaled; then
+			log G "Service started and enabled"
+		else
+			log Y "Service not healthy after initial start; attempting fallback minimal unit"
+			# Write/overwrite minimal unit referencing discovered binary
+			if command -v tailscaled &>/dev/null; then
+				TD_BIN=$(command -v tailscaled)
+				cat <<UNIT | ${SUDO} tee /etc/systemd/system/tailscaled.service >/dev/null
+[Unit]
+Description=Tailscale node agent (minimal fallback)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=${TD_BIN} --state=/var/lib/tailscale/tailscaled.state
+Restart=on-failure
+RuntimeDirectory=tailscale
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_SYS_MODULE
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_SYS_MODULE
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+				${SUDO} systemctl daemon-reload || true
+				${SUDO} systemctl restart tailscaled || true
+				if health_check_tailscaled; then
+					log G "Fallback unit started successfully"
+				else
+					log R "Fallback unit still unhealthy; collecting diagnostics"
+					DIAG_LOG=$(mktemp /tmp/tailscaled-diag-XXXX.log)
+					TMP_DIRS+=("$(dirname "${DIAG_LOG}")")
+					# Run foreground for a short time to capture errors
+					(timeout 5s "${SUDO}" "${TD_BIN}" --state=/var/lib/tailscale/tailscaled.state 2>&1 | tee "${DIAG_LOG}" >/dev/null) || true
+					log R "Diagnostics captured in ${DIAG_LOG}"
+				fi
+			fi
+		fi
 	fi
 
 	echo -e "\n🎉 Installation completed!\n\nQuick Start:\n  tailscale up\n\nAmnezia-WG commands:\n  tailscale amnezia-wg set\n  tailscale amnezia-wg get\n  tailscale amnezia-wg reset"
