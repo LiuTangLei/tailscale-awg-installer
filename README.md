@@ -6,7 +6,7 @@
 
 Tailscale with **Amnezia-WG 1.5** protocol masquerading for DPI evasion and censorship circumvention.
 
-**📚 Languages:** [English](README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
+**📚 Languages:** [English](README.md) | [中文](doc/README-zh.md) | [فارسی](doc/README-fa.md) | [Русский](doc/README-ru.md)
 
 ## 🚀 Installation
 
@@ -125,22 +125,23 @@ tailscale amnezia-wg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":
 | **Junk only**  | `{"jc":4,"jmin":64,"jmax":256}`                       | ✅ Standard |
 | **Junk + Sig** | `{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0xc0><r 16>"}` | ✅ Standard |
 
-**Advanced Configurations (Requires this fork on ALL nodes):**
+**Advanced Configurations (fork-only; all nodes must share identical values):**
 
-| Type          | Config                                                                                           | Status       |
-| ------------- | ------------------------------------------------------------------------------------------------ | ------------ |
-| **Handshake** | `{"s1":10,"s2":15,"h1":123456,"h2":789012,"h3":345678,"h4":901234}`                              | ❌ Fork only |
-| **Full**      | `{"jc":2,"s1":10,"s2":15,"h1":123456,"h2":789012,"h3":345678,"h4":901234,"i1":"<b 0xc0><r 16>"}` | ❌ Fork only |
+| Purpose                  | Minimal Example                                                                                  | Notes                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------ | ------------------------- |
+| Handshake prefixes       | `{"s1":10,"s2":15}`                                                                              | s1/s2: 0–64, must match   |
+| Header obfuscation       | `{"s1":10,"s2":15,"h1":123456,"h2":789012,"h3":345678,"h4":901234}`                              | h1–h4: 32‑bit, must match |
+| Combined (with junk/sig) | `{"jc":2,"s1":10,"s2":15,"h1":123456,"h2":789012,"h3":345678,"h4":901234,"i1":"<b 0xc0><r 16>"}` | jc / i1-i5 optional       |
 
-> **Stealth Level**: Using more parameter types (jc/i1-i5/s1-s2/h1-h4) provides better obfuscation, but avoid excessive junk packets (jc) and signatures (i1-i5) to prevent bandwidth waste and latency issues.
+> Note: Excessive junk packets (jc) or very large signature chains (i1–i5) can increase latency and bandwidth usage.
 
 ### Parameter Explanation
 
 - **jc**: Number of junk packets (0-10, must set jmin/jmax together)
 - **jmin/jmax**: Junk packet size range in bytes (64-1024, required when using jc)
 - **i1-i5**: Protocol signature packets for imitation (arbitrary hex-blob)
-- **s1/s2**: Random prefixes for Init/Response packets (0-64 bytes, requires matching values on all nodes)
-- **h1-h4**: Protocol obfuscation (32-bit values, must set all 4 or none, requires matching values on all nodes)
+- **s1/s2**: Random prefixes for Init/Response packets (0-64 bytes, requires matching values on all nodes). Pure metadata padding at handshake layer
+- **h1-h4**: Protocol obfuscation (32-bit values, must set all 4 or none, requires matching values on all nodes). Recommended each be unique; suggested practical range: 5–2147483647
 
 ### Official Parameter Ranges
 
