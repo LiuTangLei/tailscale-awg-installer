@@ -1,6 +1,6 @@
-# Tailscale 搭配 Amnezia-WG 1.5
+# Tailscale-Amnezia-WG 一键安装脚本
 
-Tailscale 集成 **Amnezia-WG 1.5** 协议，支持协议伪装，轻松应对 DPI 检测和网络封锁。
+WireGuard 协议以安全、轻量和高性能著称，但其流量特征极为鲜明，容易被DPI识别。本项目基于 Tailscale，融合 Amnezia-WG 1.5 的混淆，有效隐藏Tailscale的WireGuard 流量特征
 
 **📚 多语言:** [English](../README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
 
@@ -52,32 +52,61 @@ Set-ExecutionPolicy RemoteSigned
 Set-ExecutionPolicy Bypass -Scope Process
 ```
 
-## ⚡ 快速上手
+## ⚙️ 使用说明
 
-1. 按上方命令安装
-2. 登录 Tailscale：
+本节介绍如何首次配置和使用 Tailscale + Amnezia-WG。
+
+> **提示：** 所有 `tailscale amnezia-wg` 子命令都可以简写为 `tailscale awg`，如 `tailscale awg set`。
+
+### 1. 登录 Tailscale
+
+安装完成后，先连接到你的 Tailscale 网络：
 
 ```bash
-# 官方控制面板
+# 官方服务
 tailscale up
 
-# Headscale 用户
-tailscale up --login-server https://your-headscale-domain
+# Headscale 自建服务
+tailscale up --login-server https://你的-headscale-域名
 ```
 
-3. 需要时开启混淆：
+### 2. 首次初始化（主节点）
+
+在你的第一个节点上，运行交互式配置命令：
 
 ```bash
-# 基础 DPI 绕过（兼容任意节点）
-tailscale amnezia-wg set '{"jc":4,"jmin":64,"jmax":256}'
+tailscale amnezia-wg set
+```
 
-# 查看当前设置
+配置过程中，遇到 H1、H2、H3、H4 时可以直接输入 `random`，自动生成安全随机值。
+
+### 3. 其他节点一键同步
+
+主节点配置好后，其他设备只需执行：
+
+```bash
+tailscale amnezia-wg sync
+```
+
+即可自动同步主节点的 S1/S2/H1-H4 等核心参数。
+
+### 4. 每台设备自定义（可选）
+
+同步后，如需调整每台设备独立参数，可再次运行：
+
+```bash
+tailscale amnezia-wg set
+```
+
+只需修改你关心的参数，S1/S2/H1-H4 保持一致即可。
+
+### 常用命令
+
+```bash
+# 查看当前 Amnezia-WG 配置
 tailscale amnezia-wg get
 
-# 交互式配置
-tailscale amnezia-wg set
-
-# 恢复标准 WireGuard
+# 恢复为标准 WireGuard 协议
 tailscale amnezia-wg reset
 ```
 
@@ -166,7 +195,6 @@ tailscale amnezia-wg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":
 - 默认行为与官方 Tailscale 完全一致，只有启用混淆后才有区别
 - 垃圾包（jc）和签名（i1-i5）兼容所有 Tailscale 节点，每个节点可用不同参数
 - 协议伪装（s1/s2）和头字段（h1-h4）需所有节点参数一致
-- 基础设置下性能损耗极低
 
 ## 🛠️ 进阶用法
 
@@ -465,7 +493,7 @@ tailscale amnezia-wg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":
 
 ```bash
 # 第一个节点: 生成随机值 (每个 h1-h4 输入 'random')
-tailscale amnezia-wg set  # 提示时设置所有 h1, h2, h3, h4
+tailscale amnezia-wg set  # 按提示设置所有 h1, h2, h3, h4
 
 # 获取配置 JSON
 tailscale amnezia-wg get

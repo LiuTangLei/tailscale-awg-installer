@@ -58,32 +58,63 @@ Set-ExecutionPolicy RemoteSigned
 Set-ExecutionPolicy Bypass -Scope Process
 ```
 
-## ⚡ Quick Start
+## ⚙️ Usage
 
-1. **Install** using the commands above
-2. **Login** to Tailscale:
+This guide explains how to set up and use Tailscale with Amnezia-WG for the first time.
+
+> **Note:** All `tailscale amnezia-wg` subcommands can be shortened to `tailscale awg`. For example, `tailscale awg set` is equivalent to `tailscale amnezia-wg set`.
+
+### 1. Login to Tailscale
+
+After installation, the first step is to connect to your Tailscale network.
 
 ```bash
-# Official control plane
+# For the official Tailscale service
 tailscale up
 
-# Headscale users
+# For self-hosted Headscale servers
 tailscale up --login-server https://your-headscale-domain
 ```
 
-1. **Enable obfuscation** when needed:
+### 2. Initial Setup (First Device)
+
+On your first device, run the interactive setup command. This will configure the core Amnezia-WG parameters that will be shared across your devices.
 
 ```bash
-# Basic DPI evasion (compatible with any peer)
-tailscale amnezia-wg set '{"jc":4,"jmin":64,"jmax":256}'
+tailscale amnezia-wg set
+```
 
-# Check current settings
+You will be prompted to enter several values. For the magic headers (`H1`, `H2`, `H3`, `H4`), you can simply type **`random`** at the prompt to generate secure, random values automatically.
+
+### 3. Syncing Other Devices
+
+Once your first device is configured, you can easily sync the same settings to other devices on your Tailscale network. Run the following command on any new device:
+
+```bash
+tailscale amnezia-wg sync
+```
+
+This command will fetch the configuration from your already-configured node and apply it. This ensures all your devices share the same core parameters (`S1`, `S2`, `H1`-`H4`) required to communicate.
+
+### 4. Customizing Individual Devices (Optional)
+
+After syncing, you can still customize non-shared settings (like jitter) on a per-device basis. Run the interactive setup again:
+
+```bash
+tailscale amnezia-wg set
+```
+
+The interactive prompt will show your current settings. You can choose to modify only the parameters you need, leaving the shared core configuration (`S1`, `S2`, `H1`-`H4`) untouched.
+
+### Other Commands
+
+Here are some other useful commands:
+
+```bash
+# Check your current Amnezia-WG settings
 tailscale amnezia-wg get
 
-# Interactive setup
-tailscale amnezia-wg set
-
-# Reset to standard WireGuard
+# Reset to the standard WireGuard protocol
 tailscale amnezia-wg reset
 ```
 
