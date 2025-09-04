@@ -69,15 +69,20 @@ check_app_conflict() {
 		echo "The CLI version we're installing uses a different architecture (utun interface)"
 		echo "and will conflict with the App version (System/Network Extension)."
 		echo ""
-		echo "To proceed, we need to:"
-		echo "  • Remove the existing Tailscale.app"
-		echo "  • Install the CLI version with Amnezia-WG support"
-		echo "  • You'll need to re-authenticate after installation"
+		echo "To proceed, we need to:" 
+		echo "  • Remove the existing Tailscale.app" 
+		echo "  • Install the CLI version with Amnezia-WG support" 
+		echo "  • You'll need to re-authenticate after installation" 
 		echo ""
 
 		local response
-		read -r -p "Do you want to remove the existing Tailscale and install CLI version? [Y/n]: " response
-		response=${response:-Y} # Default to Y
+		if [[ ! -t 0 ]]; then
+			# Running via pipe (curl | bash); read from controlling terminal to enable interaction
+			read -r -p "Do you want to remove the existing Tailscale and install CLI version? [Y/n]: " response </dev/tty || response="Y"
+		else
+			read -r -p "Do you want to remove the existing Tailscale and install CLI version? [Y/n]: " response
+		fi
+		response=${response:-Y}
 
 		case ${response} in
 		[yY][eE][sS] | [yY])
@@ -85,10 +90,8 @@ check_app_conflict() {
 			remove_existing_tailscale
 			;;
 		*)
-			warn "Installation cancelled by user."
-			echo "If you want to keep the App version, you cannot install the CLI version."
-			echo "Consider using the existing App version or manually remove it first."
-			exit 0
+			warn "User chose to keep existing App version. Continuing with CLI binary installation (may conflict)."
+			echo "If you later see conflicts, rerun and choose Y or uninstall the App manually."
 			;;
 		esac
 	fi
@@ -153,6 +156,10 @@ remove_existing_tailscale() {
 		echo ""
 
 		local response
+		# Check if we're running from a pipe (curl | bash)
+		if [[ ! -t 0 ]]; then
+			exec < /dev/tty
+		fi
 		read -r -p "Press Enter after you've disabled the Tailscale Network Extension..." response
 
 		# Verify removal
