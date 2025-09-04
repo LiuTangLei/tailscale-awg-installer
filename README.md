@@ -13,9 +13,11 @@ Enhanced Tailscale client with **Amnezia-WG 1.5** obfuscation: junk traffic, pro
 | Platform                   | Command / Action                                                                                                 |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Linux                      | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh \| bash`  |
-| macOS                      | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash`  |
+| macOS\*                    | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash`  |
 | Windows (Admin PowerShell) | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
 | Android                    | Download APK: [releases](https://github.com/LiuTangLei/tailscale-android/releases)                               |
+
+**macOS note:** Due to system integrity protections, the installer uses CLI-only Tailscale. If the official Tailscale.app is detected, you'll be prompted to remove it to avoid conflicts.
 
 Android build currently supports AWG config sync (receive) from another configured node. Use the in‑app Sync button:
 
@@ -39,6 +41,11 @@ $scriptContent = (iwr -useb https://your-mirror-site.com/https://raw.githubuserc
 ```
 
 PowerShell policy (if blocked): `Set-ExecutionPolicy RemoteSigned` (or `Bypass -Scope Process`)
+
+### macOS Installation Notes
+
+- **CLI-only deployment**: Uses open-source `tailscaled` (utun interface) for full compatibility with custom builds
+- **App conflict handling**: Automatically detects and offers to remove official Tailscale.app to prevent system extension conflicts
 
 ## ⚡ Quick Start
 

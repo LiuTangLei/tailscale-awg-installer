@@ -13,9 +13,11 @@ WireGuard 协议以安全、轻量和高性能著称，但其流量特征极为�
 | 平台                        | 命令 / 操作                                                                                                |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------- | ----- |
 | Linux                       | `curl -fsSL <https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh>   | bash` |
-| macOS                       | `curl -fsSL <https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh>   | bash` |
+| macOS\*                     | `curl -fsSL <https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh>   | bash` |
 | Windows (管理员 PowerShell) | `iwr -useb <https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1> | iex`  |
 | Android                     | 下载 APK: [releases](https://github.com/LiuTangLei/tailscale-android/releases)                             |
+
+**\*macOS 说明：** 由于系统完整性保护，安装程序使用 CLI 版本的 Tailscale。如果检测到官方 Tailscale.app，会提示您删除以避免冲突。
 
 Android 版本目前支持从另一个已配置的节点同步（接收）AWG 配置。请使用应用内的同步按钮：
 
@@ -39,6 +41,11 @@ $scriptContent = (iwr -useb https://your-mirror-site.com/https://raw.githubuserc
 ```
 
 PowerShell 策略 (如果被阻止): `Set-ExecutionPolicy RemoteSigned` (或 `Bypass -Scope Process`)
+
+### macOS 安装说明
+
+- **纯命令行部署**: 使用开源版 `tailscaled` (utun接口) 以确保与自定义构建的完全兼容
+- **应用冲突处理**: 自动检测并提供删除官方 Tailscale.app 的选项，以防止系统扩展冲突
 
 ## ⚡ 快速入门
 
