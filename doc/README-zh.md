@@ -1,31 +1,41 @@
-# Tailscale with Amnezia-WG 1.5
+# Tailscale with Amnezia‑WG 2.0（v1.88.2+）
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
 [![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20Android-blue)](https://github.com/LiuTangLei/tailscale/releases/latest)
-[![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](LICENSE)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](../LICENSE)
 
-WireGuard 协议以安全、轻量和高性能著称，但其流量特征极为鲜明，容易被DPI识别。本项目基于 Tailscale，融合 Amnezia-WG 1.5 的混淆，有效隐藏Tailscale的WireGuard 流量特征
+WireGuard 协议以安全、轻量和高性能著称，但其流量特征极为鲜明，容易被DPI识别。本项目基于 Tailscale，融合 Amnezia-WG 2.0 的混淆，有效隐藏Tailscale的WireGuard 流量特征
 
-**📚 语言:** [English](README.md) | [中文](doc/README-zh.md) | [فارسی](doc/README-fa.md) | [Русский](doc/README-ru.md)
+语言： [English](../README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
 
-## 🚀 安装
+AWG 1.5 旧文档： [README-awg-v1.5.md](README-awg-v1.5.md)
 
-| 平台                        | 命令 / 操作                                                                                                |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------- | ----- |
-| Linux                       | `curl -fsSL <https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh>   | bash` |
-| macOS\*                     | `curl -fsSL <https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh>   | bash` |
-| Windows (管理员 PowerShell) | `iwr -useb <https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1> | iex`  |
-| Android                     | 下载 APK: [releases](https://github.com/LiuTangLei/tailscale-android/releases)                             |
+## 破坏性变更（v1.88.2+）
 
-**\*macOS 说明：** 由于系统完整性保护，安装程序使用 CLI 版本的 Tailscale。如果检测到官方 Tailscale.app，会提示您删除以避免冲突。
+- h1–h4 从"固定值"改为"范围（闭区间）"，四个范围不得重叠
+- 新增 s3、s4（在 s1、s2 基础上）
+- 交互式自动生成：`tailscale awg set` 提示 "Do you want to generate random AWG parameters automatically? [Y/n]:" 时按回车，可自动生成除 i1–i5 外所有参数
 
-Android 版本目前支持从另一个已配置的节点同步（接收）AWG 配置。请使用应用内的同步按钮：
+1.x 配置与 2.0 不兼容，请参考"从 1.x 迁移"。
 
-![Android AWG 同步示例](doc/sync1.jpg)
+## 安装
 
-### 镜像 (可选)
+| 平台    | 命令 / 操作 |
+| ------- | ----------- |
+| Linux   | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh \| bash` |
+| macOS*  | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash` |
+| Windows | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
+| Android | 从 [releases](https://github.com/LiuTangLei/tailscale-android/releases) 下载 APK |
 
-如果 GitHub 访问缓慢或被封锁，您可以通过 [gh-proxy](https://github.com/hunshcn/gh-proxy) 自建一个前缀镜像 (例如 `https://your-mirror-site.com`)：
+macOS：脚本使用 CLI 版 tailscaled，如检测到官方 Tailscale.app，将提示移除以避免冲突。
+
+Android 支持从其它已配置节点"接收"AWG 配置（应用内点 Sync）。
+
+![Android 同步示例](sync1.jpg)
+
+## 镜像（可选）
+
+如果 GitHub 访问缓慢或被屏蔽，可通过 gh-proxy 自建前缀镜像（如 `https://your-mirror-site.com`）：
 
 ```bash
 # Linux
@@ -37,21 +47,21 @@ curl -fsSL https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTan
 
 ```powershell
 # Windows
-$scriptContent = (iwr -useb https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1).Content; $scriptBlock = [scriptblock]::Create($scriptContent); & $scriptBlock -MirrorPrefix \'https://your-mirror-site.com/\'
+$scriptContent = (iwr -useb https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1).Content; $scriptBlock = [scriptblock]::Create($scriptContent); & $scriptBlock -MirrorPrefix 'https://your-mirror-site.com/'
 ```
 
-PowerShell 策略 (如果被阻止): `Set-ExecutionPolicy RemoteSigned` (或 `Bypass -Scope Process`)
+PowerShell 执行策略（如被阻止）：`Set-ExecutionPolicy RemoteSigned`（或 `Bypass -Scope Process`）
 
-### macOS 安装说明
+## macOS 安装说明
 
-- **纯命令行部署**: 使用开源版 `tailscaled` (utun接口) 以确保与自定义构建的完全兼容
-- **应用冲突处理**: 自动检测并提供删除官方 Tailscale.app 的选项，以防止系统扩展冲突
+- 仅 CLI 部署：使用开源 `tailscaled`（utun 接口）以完全兼容自定义构建
+- 应用冲突处理：自动检测并提供移除官方 Tailscale.app 以防止系统扩展冲突
 
-## ⚡ 快速入门
+## 快速入门
 
-> 提示: `tailscale amnezia-wg` → `tailscale awg` (别名)
+提示：`tailscale amnezia-wg` 等于 `tailscale awg`
 
-1. 登录:
+1. 登录
 
 ```bash
 # 官方
@@ -60,202 +70,140 @@ tailscale up
 tailscale up --login-server https://your-headscale-domain
 ```
 
-2. 第一台设备 (生成共享核心值):
+1. 交互设置（推荐自动生成）
 
 ```bash
 tailscale awg set
 ```
 
-为 H1–H4 输入 `random` 以自动生成安全的 32 位值。
+出现自动生成提示时直接回车，除 i1–i5 外均会生成随机安全值。
 
-3. 同步其他设备:
-   - 桌面端: `tailscale awg sync`
-   - Android: 点击同步按钮 (见上图)
-4. 可选的设备级微调: 重新运行 `tailscale awg set` 并只更改非共享字段 (保持 S1/S2/H1–H4 不变)。
-5. 常用命令:
+1. 同步到其它设备
 
-```bash
-tailscale awg get     # 显示 JSON
-tailscale awg reset   # 恢复为原生 WireGuard
-```
+- 桌面端：`tailscale awg sync`
+- Android：应用内 Sync 按钮
 
-## 🛡️ 功能
+1. 按需微调：再次运行 `tailscale awg set`，若不需要协议签名，可不设置 i1–i5。
 
-### 垃圾流量 & 签名
-
-添加伪造数据包和协议签名以规避 DPI。与标准 Tailscale 对等节点兼容：
+1. 常用命令
 
 ```bash
-# 基本垃圾流量
-tailscale awg set \'{"jc":4,"jmin":64,"jmax":256}\'
-
-# 带协议签名 (i1-i5)
-tailscale awg set \'{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0xc0><r 16>","i2":"<b 0x40><r 12>"}\'
+tailscale awg get
+tailscale awg reset
 ```
 
-### 协议伪装
+## 功能与示例
 
-要求所有节点都使用此分支版本，并具有完全相同的设置 (ix 签名不需要匹配)：
+- 垃圾流量与签名（与标准节点可互通）
 
 ```bash
-# 握手混淆 (s1/s2 在所有节点上必须匹配)
-tailscale awg set \'{"s1":10,"s2":15}\'
-
-# 带头部字段 (h1-h4 用于协议混淆，在所有节点上必须匹配)
-tailscale awg set \'{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777}\'
-
-# 结合签名 (i1-i5 可在每个节点上不同)
-tailscale awg set \'{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777,"i1":"<b 0xc0><r 32><c><t>"}\'
+# 基础垃圾流量
+tailscale awg set '{"jc":4,"jmin":64,"jmax":256}'
+# 协议签名（i1–i5 可选）
+tailscale awg set '{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0x40><r 12>"}'
 ```
 
-## 🎯 配置
+- 协议伪装（所有节点需使用本分支；s1–s4 与 h1–h4 必须一致，i1–i5 无需一致）
 
-基础 (可与标准客户端协同工作):
+```bash
+# 握手混淆
+tailscale awg set '{"s1":10,"s2":15,"s3":8,"s4":0}'
+# 头部范围（不重叠）
+tailscale awg set '{"s1":10,"s2":15,"s3":8,"s4":0,"h1":{"min":100000,"max":200000},"h2":{"min":300000,"max":350000},"h3":{"min":400000,"max":450000},"h4":{"min":500000,"max":550000}}'
+# 混合（含签名）
+tailscale awg set '{"s1":10,"s2":15,"s3":8,"s4":0,"h1":{"min":100000,"max":200000},"h2":{"min":300000,"max":350000},"h3":{"min":400000,"max":450000},"h4":{"min":500000,"max":550000},"i1":"<b 0xc0><r 32><c><t>"}'
+```
 
-| 类型            | JSON                                                            | 兼容性 |
-| --------------- | --------------------------------------------------------------- | ------ |
-| 仅垃圾流量      | `{\"jc\":4,\"jmin\":64,\"jmax\":256}`                           | ✅ 是  |
-| 垃圾流量 + 签名 | `{\"jc\":2,\"jmin\":64,\"jmax\":128,\"i1\":\"<b 0xc0><r 16>\"}` | ✅ 是  |
+## 配置参考
 
-高级 (所有节点必须使用此分支并共享 S1/S2/H1–H4):
+- 基础（与标准客户端互通）
 
-| 用途     | 示例                                                                                                               | 注意事项            |
-| -------- | ------------------------------------------------------------------------------------------------------------------ | ------------------- |
-| 握手前缀 | `{\"s1\":10,\"s2\":15}`                                                                                            | s1/s2: 0–64 字节    |
-| 头部混淆 | `{\"s1\":10,\"s2\":15,\"h1\":123456,\"h2\":789012,\"h3\":345678,\"h4\":901234}`                                    | 设置所有 h1–h4      |
-| 组合     | `{\"jc\":2,\"s1\":10,\"s2\":15,\"h1\":123456,\"h2\":789012,\"h3\":345678,\"h4\":901234,\"i1\":\"<b 0xc0><r 16>\"}` | 垃圾流量/签名为可选 |
+| 用途        | JSON                                                  | 兼容 |
+| ----------- | ----------------------------------------------------- | ---- |
+| 仅垃圾流量  | `{"jc":4,"jmin":64,"jmax":256}`                       | ✅   |
+| 垃圾+签名   | `{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0xc0><r 16>"}` | ✅   |
 
-参数:
+- 高级（所有节点共享 s1–s4 与 h1–h4）
 
-- jc (0–10) 与 jmin/jmax (64–1024): 垃圾数据包数量和大小范围
-- i1–i5: 可选的签名链 (十六进制格式的迷你语言)
-- s1/s2 (0–64 字节): 握手填充前缀 (在所有 AWG 节点间必须匹配)
-- h1–h4 (32 位整数): 头部混淆 (要么全部设置，要么全不设置；必须匹配)。选择随机唯一值 (建议 5–2147483647)
+| 用途     | 示例                                                                                                                                     | 说明                                   |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 握手前缀 | `{"s1":10,"s2":15,"s3":8,"s4":0}`                                                                                                         | s1–s4 在所有节点必须一致               |
+| 头部范围 | `{"s1":10,"s2":15,"s3":8,"s4":0,"h1":{"min":100000,"max":200000},"h2":{"min":300000,"max":350000},"h3":{"min":400000,"max":450000},"h4":{"min":500000,"max":550000}}`             | h1–h4 为范围且不得重叠，且必须一致     |
+| 组合     | `{"jc":2,"s1":10,"s2":15,"s3":8,"s4":0,"h1":{"min":100000,"max":200000},"h2":{"min":300000,"max":350000},"h3":{"min":400000,"max":450000},"h4":{"min":500000,"max":550000},"i1":"<b 0xc0><r 16>"}` | 垃圾/签名可选                           |
 
-注意: 非常大的垃圾包数量或过长的签名链会增加延迟和带宽消耗。
+参数说明：
 
-## 📊 平台支持
+- jc（0–10）与 jmin/jmax（64–1024）：垃圾包数量与大小范围
+- i1–i5：可选协议签名链（十六进制迷你语言）
+- s1–s4：握手前缀/填充字段（所有 AWG 节点间必须一致）
+- h1–h4：头部字段范围，每项 {"min": low, "max": high}（闭区间），四个范围不得重叠；要么全部设置，要么全不设置；必须一致
+
+## 平台支持
 
 | 平台    | 架构                 | 状态                |
 | ------- | -------------------- | ------------------- |
-| Linux   | x86_64, ARM64        | ✅ 完全支持         |
-| macOS   | Intel, Apple Silicon | ✅ 完全支持         |
-| Windows | x86_64, ARM64        | ✅ 安装程序         |
-| Android | ARM64, ARM           | ✅ APK (仅同步 AWG) |
+| Linux   | x86_64, ARM64        | ✅ 完整             |
+| macOS   | Intel, Apple Silicon | ✅ 完整             |
+| Windows | x86_64, ARM64        | ✅ 安装器           |
+| Android | ARM64, ARM           | ✅ APK（仅同步 AWG） |
 
-## 🔄 从官方 Tailscale 迁移
+## 从 1.x 迁移
 
-1. 运行安装程序 - 它会自动替换二进制文件，同时保留您的设置
-2. 您现有的身份验证和配置将保持不变
-3. 从基础混淆开始: `tailscale awg set \'{\"jc\":4,\"jmin\":64,\"jmax\":256}\'`
-
-## ⚠️ 注意事项
-
-- 在应用 AWG 配置之前，其行为与原生版本无异
-- 垃圾流量/签名功能可与标准客户端互操作 (每个节点的值可以不同)
-- s1/s2 和 h1–h4 要求每个通信节点共享完全相同的值
-- 请备份您的配置 (使用 `tailscale awg get`)
-
-## 🛠️ 高级用法
-
-### 头部字段配置 (h1-h4)
-
-协议混淆，用于规避 WireGuard 检测。必须设置全部 4 个值，或者都不设置：
+1. 所有节点升级至 v1.88.2+（本仓库构建）
+1. 可选：清空旧 1.x 配置
 
 ```bash
-# 第一个节点：生成随机值 (为每个 h1-h4 输入 \'random\')
-tailscale awg set  # 在提示时设置所有 h1, h2, h3, h4
-
-# 获取配置 JSON
-tailscale awg get
-
-# 将整个 JSON 复制到其他节点 (必须包含所有 h1-h4)
-tailscale awg set \'{\"s1\":10,\"s2\":15,\"h1\":3946285740,\"h2\":1234567890,\"h3\":987654321,\"h4\":555666777}\'
-```
-
-### 创建协议签名
-
-1. 使用 Wireshark 捕获真实流量
-2. 从头部提取十六进制模式
-3. 构建格式: `<b 0xHEX>` (静态), `<r LENGTH>` (随机), `<c>` (计数器), `<t>` (时间戳)
-4. 示例: `<b 0xc0000000><r 16><c><t>` = 类似 QUIC 的头部 + 16 字节随机数据 + 计数器 + 时间戳
-
-### 混淆包 I1–I5 (签名链) & CPS (自定义协议签名)
-
-在每次“特殊”握手（每 120 秒）之前，客户端可能会发送最多五个自定义 UDP 包（I1–I5），采用 CPS 格式进行协议模仿。
-
-**CPS 格式:**
-
-```text
-i{n} = <tag1><tag2><tag3>...<tagN>
-```
-
-**标签类型:**
-
-| 标签 | 格式           | 描述                            | 约束条件      |
-| ---- | -------------- | ------------------------------- | ------------- |
-| b    | `<b hex_data>` | 用于模拟协议的静态字节          | 任意长度      |
-| c    | `<c>`          | 数据包计数器 (32位, 网络字节序) | 每个链中唯一  |
-| t    | `<t>`          | Unix 时间戳 (32位, 网络字节序)  | 每个链中唯一  |
-| r    | `<r length>`   | 加密安全的随机字节              | length ≤ 1000 |
-
-**示例:**
-
-```text
-i1 = <b 0xf6ab3267fa><c><b 0xf6ab><t><r 10>
-```
-
-> ⚠️ 如果未设置 i1，则整个链 (I2–I5) 都将被跳过。
-
-#### 使用 Wireshark 捕获真实的混淆包
-
-1. 启动 Amnezia-WG 并配置 i1–i5 参数
-2. 使用 Wireshark 监控 UDP 端口 (例如，过滤器: `udp.port == 51820`)
-3. 观察并分析混淆包，根据需要提取协议签名
-
-更多详情，请参阅 [Amnezia-WG 官方文档](https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted)
-
-## 🐛 问题排查
-
-### 验证安装
-
-```bash
-tailscale version          # 检查客户端版本
-tailscale awg get          # 验证 Amnezia-WG 支持
-```
-
-### 连接问题
-
-```bash
-# 重置为标准 WireGuard
 tailscale awg reset
+```
 
-# 首先尝试基本设置
-tailscale awg set \'{\"jc\":2,\"jmin\":64,\"jmax\":128}\'
+1. 在每台设备运行 `tailscale awg set` 并按回车自动生成参数（除 i1–i5）
+1. 用 `tailscale awg get` 分发或用 `tailscale awg sync` 同步
+1. 启用伪装的节点之间 s1–s4 与 h1–h4 必须一致，且 h1–h4 不重叠
 
-# 检查日志 (Linux)
+注意：1.x 与 2.0 之间协议伪装不互通。
+
+## 高级：创建协议签名（i1–i5）
+
+1. 用 Wireshark 抓包
+1. 从头部提取十六进制模式
+1. 组合：`<b 0xHEX>`（静态）、`<r N>`（随机 N 字节）、`<c>`（计数器）、`<t>`（时间戳）
+1. 例：`<b 0xc0><r 16><c><t>`
+
+CPS 链格式：
+
+```text
+i{n} = <tag1><tag2>...<tagN>
+```
+
+若 i1 未设置，则 I2–I5 会被跳过。
+
+## 排错
+
+```bash
+tailscale version
+tailscale awg get
+```
+
+连接问题：
+
+```bash
+tailscale awg reset
 sudo journalctl -u tailscaled -f
 ```
 
-### Windows PowerShell 问题
-
-使用交互模式以避免 JSON 转义问题：
+PowerShell 建议使用交互模式：
 
 ```powershell
-tailscale awg set  # 交互式设置
+tailscale awg set
 ```
 
-## 🤝 链接与支持
+## 链接
 
-- Releases: [LiuTangLei/tailscale](https://github.com/LiuTangLei/tailscale/releases)
-- Android APK: [tailscale-android](https://github.com/LiuTangLei/tailscale-android/releases)
-- 安装程序问题: [Issue Tracker](https://github.com/LiuTangLei/tailscale-awg-installer/issues)
-- Amnezia-WG 文档: [官方文档](https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted)
+- Releases: <https://github.com/LiuTangLei/tailscale/releases>
+- Android APK: <https://github.com/LiuTangLei/tailscale-android/releases>
+- 安装器问题: <https://github.com/LiuTangLei/tailscale-awg-installer/issues>
+- Amnezia‑WG 文档: <https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted>
 
-## 📄 许可证
+## 许可证
 
-BSD 3-Clause 许可证 (与上游 Tailscale 相同)
-
----
-
-**免责声明**: 仅用于教育和合法的隐私保护目的。您有责任遵守当地法律。
+BSD 3‑Clause（与上游相同）
