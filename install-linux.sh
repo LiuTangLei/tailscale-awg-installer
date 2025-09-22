@@ -369,7 +369,7 @@ start_tailscaled_with_fallback() {
 
 # Main installation process
 main() {
-	echo "🔧 Tailscale Amnezia-WG Installer"
+	echo "🔧 Tailscale Amnezia-WG 2.0 Installer"
 
 	# Parse arguments
 	while [[ $# -gt 0 ]]; do
@@ -429,7 +429,9 @@ EOF
 	# Start service
 	if command -v systemctl &>/dev/null; then
 		ensure_dirs
-		${SUDO} systemctl enable --now tailscaled &>/dev/null || true
+		${SUDO} systemctl daemon-reload || true
+		${SUDO} systemctl enable tailscaled &>/dev/null || true
+		${SUDO} systemctl restart tailscaled &>/dev/null || true
 		if health_check_tailscaled; then
 			log G "Service started and enabled"
 		else
@@ -470,7 +472,7 @@ UNIT
 		fi
 	fi
 
-	echo -e "\n🎉 Installation completed!\n\nQuick Start:\n  tailscale up\n\nAmnezia-WG commands:\n  tailscale amnezia-wg set\n  tailscale amnezia-wg get\n  tailscale amnezia-wg reset"
+	echo -e "\n🎉 Installation completed!\n\nQuick Start:\n  tailscale up\n\nAmnezia-WG commands (awg = amnezia-wg):\n  tailscale awg set        # Configure obfuscation (auto-generate with Enter)\n  tailscale awg get        # Show current config\n  tailscale awg sync       # Sync config from other nodes\n  tailscale awg reset      # Disable obfuscation"
 }
 
 main "$@"

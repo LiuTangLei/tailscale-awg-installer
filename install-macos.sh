@@ -69,10 +69,10 @@ check_app_conflict() {
 		echo "The CLI version we're installing uses a different architecture (utun interface)"
 		echo "and will conflict with the App version (System/Network Extension)."
 		echo ""
-		echo "To proceed, we need to:" 
-		echo "  • Remove the existing Tailscale.app" 
-		echo "  • Install the CLI version with Amnezia-WG support" 
-		echo "  • You'll need to re-authenticate after installation" 
+		echo "To proceed, we need to:"
+		echo "  • Remove the existing Tailscale.app"
+		echo "  • Install the CLI version with Amnezia-WG support"
+		echo "  • You'll need to re-authenticate after installation"
 		echo ""
 
 		local response
@@ -158,7 +158,7 @@ remove_existing_tailscale() {
 		local response
 		# Check if we're running from a pipe (curl | bash)
 		if [[ ! -t 0 ]]; then
-			exec < /dev/tty
+			exec </dev/tty
 		fi
 		read -r -p "Press Enter after you've disabled the Tailscale Network Extension..." response
 
@@ -342,6 +342,13 @@ PLIST
 
 	# Ensure directories exist
 	${SUDO} mkdir -p /var/lib/tailscale /var/run
+
+	# Ensure service is stopped before starting (force restart)
+	if launchctl list | grep -q com.tailscale.tailscaled 2>/dev/null; then
+		info "Ensuring tailscaled is stopped before restart..."
+		${SUDO} launchctl unload /Library/LaunchDaemons/com.tailscale.tailscaled.plist 2>/dev/null || true
+		sleep 1
+	fi
 
 	info "Starting tailscaled (launchctl load)..."
 	${SUDO} launchctl load /Library/LaunchDaemons/com.tailscale.tailscaled.plist 2>/dev/null || true
@@ -534,11 +541,12 @@ usage() {
 	echo ""
 	ok "Installation completed successfully! 🎉"
 	echo ""
-	echo "🔧 Amnezia-WG Commands:"
+	echo "🔧 Amnezia-WG Commands (awg = amnezia-wg):"
 	echo "  tailscale up                    # Connect to your network (re-auth required)"
-	echo "  tailscale amnezia-wg set        # Enable Amnezia-WG obfuscation"
-	echo "  tailscale amnezia-wg get        # Check current Amnezia-WG status"
-	echo "  tailscale amnezia-wg reset      # Disable Amnezia-WG obfuscation"
+	echo "  tailscale awg set               # Configure obfuscation (auto-generate with Enter)"
+	echo "  tailscale awg get               # Show current config"
+	echo "  tailscale awg sync              # Sync config from other nodes"
+	echo "  tailscale awg reset             # Disable obfuscation"
 	echo ""
 	echo "💡 Troubleshooting:"
 	echo "  • If commands not found, restart your terminal or run:"
@@ -551,7 +559,7 @@ usage() {
 }
 
 main() {
-	echo "🔧 macOS Installer (Amnezia-WG 1.5)"
+	echo "🔧 macOS Installer (Amnezia-WG 2.0)"
 
 	# Parse arguments
 	local ACTION="install"

@@ -1,4 +1,4 @@
-# Windows-only installer (PowerShell): replace official Tailscale with Amnezia-WG-enabled binaries
+# Windows-only installer (PowerShell): replace official Tailscale with Amnezia-WG 2.0-enabled binaries
 # Compatible with Windows PowerShell 5.1 and PowerShell 7+
 # Requires: Admin
 #
@@ -387,7 +387,10 @@ if (Test-Path $ipnPath) {
 Write-Host ''
 Write-Host 'Quick Start:'
 Write-Host '  tailscale up'
-Write-Host '  tailscale amnezia-wg set'
-Write-Host '  tailscale amnezia-wg get'
-Write-Host '  tailscale amnezia-wg reset'
+Write-Host ''
+Write-Host 'Amnezia-WG commands (awg = amnezia-wg):'
+Write-Host '  tailscale awg set        # Configure obfuscation (auto-generate with Enter)'
+Write-Host '  tailscale awg get        # Show current config'
+Write-Host '  tailscale awg sync       # Sync config from other nodes'
+Write-Host '  tailscale awg reset      # Disable obfuscation'
 Write-Host ''
