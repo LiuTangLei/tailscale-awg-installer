@@ -35,6 +35,16 @@ Android может «получать» конфигурацию AWG с друг
 
 ![Пример синхронизации AWG на Android](sync1.jpg)
 
+### Docker Compose
+
+В репозитории есть `docker-compose.yml`, который запускает контейнер `tailscaled` с поддержкой AWG:
+
+1. Поднимите сервис: `docker compose up -d`
+2. Авторизуйтесь внутри контейнера: `docker compose exec tailscaled tailscale up` (для Headscale добавьте `--login-server https://your-headscale-domain`)
+3. Все интерактивные команды совпадают с установкой на хосте, например `docker compose exec tailscaled tailscale awg sync`
+
+Поддерживаемые платформы соответствуют официальному Docker-образу Tailscale.
+
 ## Быстрый старт
 
 Подсказка: `tailscale amnezia-wg` = `tailscale awg`

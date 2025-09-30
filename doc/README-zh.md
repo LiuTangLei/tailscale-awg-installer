@@ -33,6 +33,16 @@ Android 支持从其它已配置节点"接收"AWG 配置（应用内点 Sync）�
 
 ![Android 同步示例](sync1.jpg)
 
+### Docker Compose
+
+仓库已内置 `docker-compose.yml`，可直接启动带 AWG 功能的 `tailscaled` 容器：
+
+1. 启动服务：`docker compose up -d`
+2. 容器内登录：`docker compose exec tailscaled tailscale up`（如使用自建 Headscale，加上 `--login-server https://你的域名`）
+3. 后续交互命令与本地安装一致，例如 `docker compose exec tailscaled tailscale awg sync`
+
+支持平台与官方 Tailscale Docker 镜像保持一致。
+
 ## 镜像（可选）
 
 如果 GitHub 访问缓慢或被屏蔽，可通过 gh-proxy 自建前缀镜像（如 `https://your-mirror-site.com`）：

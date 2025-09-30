@@ -37,6 +37,16 @@ Android build currently supports AWG config sync (receive) from another configur
 
 ![Android AWG Sync Example](doc/sync1.jpg)
 
+### Docker Compose
+
+Prefer containers? The repo ships with `docker-compose.yml` that runs the bundled `tailscaled` image with AWG support:
+
+1. Start the service: `docker compose up -d`
+2. Authenticate inside the container: `docker compose exec tailscaled tailscale up` (add `--login-server https://your-headscale-domain` if you use self-hosted Headscale)
+3. Run interactive commands exactly like on a host install, e.g. `docker compose exec tailscaled tailscale awg sync`
+
+The supported platforms match the upstream Tailscale Docker image.
+
 ### Mirrors (optional)
 
 Self-host a prefix mirror (e.g. `https://your-mirror-site.com`) via gh-proxy if GitHub is slow/blocked:

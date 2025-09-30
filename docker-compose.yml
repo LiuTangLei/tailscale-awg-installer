@@ -1,0 +1,21 @@
+services:
+  tailscaled:
+    image: ltlei/tailscale-awg:latest
+    container_name: tailscaled
+    network_mode: "host"
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    volumes:
+      - /var/lib/tailscale:/var/lib/tailscale
+      - /var/run/tailscale:/var/run/tailscale
+    environment:
+      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
+    command: >
+      tailscaled
+      --state=/var/lib/tailscale/tailscaled.state
+      --socket=/var/run/tailscale/tailscaled.sock

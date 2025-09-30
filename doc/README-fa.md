@@ -34,6 +34,16 @@ macOS: اسکریپت از نسخه CLI tailscaled استفاده می‌کند�
 
 ![Android Sync](sync1.jpg)
 
+### Docker Compose
+
+در مخزن فایل `docker-compose.yml` وجود دارد که کانتینر `tailscaled` با پشتیبانی AWG را بالا می‌آورد:
+
+1. سرویس را اجرا کنید: `docker compose up -d`
+2. داخل کانتینر احراز هویت کنید: `docker compose exec tailscaled tailscale up` (برای Headscale خودمیزبان `--login-server https://your-headscale-domain` را اضافه کنید)
+3. پس از ورود، همه دستورات تعاملی مشابه نصب محلی هستند، مثل `docker compose exec tailscaled tailscale awg sync`
+
+پلتفرم‌های پشتیبانی‌شده همان موارد ایمیج رسمی Docker تیل‌اسکیل هستند.
+
 ## شروع سریع
 
 نکته: `tailscale amnezia-wg` = `tailscale awg`
