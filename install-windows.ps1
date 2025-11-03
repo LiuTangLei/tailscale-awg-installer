@@ -89,6 +89,14 @@ function Invoke-WebRequestCompat([string]$Uri, [string]$OutFile) {
 #endregion
 
 #region Service Management Functions
+function Get-OfficialVersionFromTag([string]$Tag) {
+  # Extract official Tailscale version from fork tag (e.g., v1.88.4 from v1.88.4-awg2.0-x)
+  if ($Tag -match '^v?(\d+\.\d+\.\d+)') {
+    return $Matches[1]
+  }
+  return $null
+}
+
 function Wait-ServiceStatus([string]$Name, [ValidateSet('Running', 'Stopped')][string]$Status, [int]$TimeoutSec = 30) {
   $sw = [Diagnostics.Stopwatch]::StartNew()
   while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
@@ -184,8 +192,27 @@ if (-not (Get-Command tailscale.exe -ErrorAction SilentlyContinue) -and -not $sv
   Write-Warn 'Tailscale not found. Installing official version...'
   $installed = $false
 
-  # Try winget first
-  if (Get-Command winget.exe -ErrorAction SilentlyContinue) {
+  # Detect fork version to match official Tailscale version
+  $officialVersion = $null
+  if ($Version -eq 'latest') {
+    try {
+      Write-Info "Detecting fork version to match official Tailscale..."
+      $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
+      $forkTag = $resp.tag_name
+      $officialVersion = Get-OfficialVersionFromTag -Tag $forkTag
+      if ($officialVersion) {
+        Write-Info "Fork version $forkTag -> will install official Tailscale $officialVersion"
+      }
+    } catch { Write-Warn "Could not detect fork version: $($_.Exception.Message)" }
+  } else {
+    $officialVersion = Get-OfficialVersionFromTag -Tag $Version
+    if ($officialVersion) {
+      Write-Info "Will install official Tailscale $officialVersion to match fork $Version"
+    }
+  }
+
+  # Try winget first (only if no specific version needed, as winget may install latest)
+  if (-not $officialVersion -and (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
     try {
       & winget install -e --id Tailscale.Tailscale --silent --accept-package-agreements --accept-source-agreements
       Start-Sleep -Seconds 3
@@ -193,11 +220,16 @@ if (-not (Get-Command tailscale.exe -ErrorAction SilentlyContinue) -and -not $sv
     } catch { Write-Warn "winget failed: $($_.Exception.Message)" }
   }
 
-  # Try MSI if winget failed and enabled
+  # Try MSI if winget failed/skipped and enabled
   if (-not $installed -and $EnableMsiFallback) {
-    $msiUrl = if ($arch -eq 'amd64') { 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' } else { 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-arm64.msi' }
+    # Use version-specific URL if detected, otherwise use latest
+    if ($officialVersion) {
+      $msiUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-$officialVersion-$arch.msi"
+    } else {
+      $msiUrl = if ($arch -eq 'amd64') { 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' } else { 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-arm64.msi' }
+    }
     try {
-      Write-Warn "Trying MSI installer..."
+      Write-Warn "Trying MSI installer from $msiUrl..."
       $tmpMsi = "$env:TEMP\tailscale-$([guid]::NewGuid()).msi"
       Invoke-WebRequestCompat -Uri $msiUrl -OutFile $tmpMsi
       $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$tmpMsi`"", '/qn', '/norestart') -Wait -PassThru
