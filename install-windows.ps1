@@ -97,6 +97,32 @@ function Get-OfficialVersionFromTag([string]$Tag) {
   return $null
 }
 
+function Get-InstalledTailscaleVersion {
+  # Try to get version from GUI binary (tailscale-ipn.exe) if it exists
+  $ipnPath = "$Env:ProgramFiles\Tailscale\tailscale-ipn.exe"
+  if (Test-Path $ipnPath) {
+    try {
+      $versionInfo = (Get-Item $ipnPath).VersionInfo
+      if ($versionInfo.ProductVersion) {
+        # ProductVersion may include extra info, extract just x.y.z
+        if ($versionInfo.ProductVersion -match '(\d+\.\d+\.\d+)') {
+          return $Matches[1]
+        }
+      }
+    } catch { }
+  }
+
+  # Fallback: try tailscale.exe command
+  try {
+    $output = & tailscale.exe version 2>&1 | Select-Object -First 1
+    if ($output -match '(\d+\.\d+\.\d+)') {
+      return $Matches[1]
+    }
+  } catch { }
+
+  return $null
+}
+
 function Wait-ServiceStatus([string]$Name, [ValidateSet('Running', 'Stopped')][string]$Status, [int]$TimeoutSec = 30) {
   $sw = [Diagnostics.Stopwatch]::StartNew()
   while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
@@ -186,32 +212,51 @@ if ($svc) {
   }
 }
 
-# Install official Tailscale if missing
+# Detect fork version to match official Tailscale version
+$officialVersion = $null
+$forkTag = $Version
+if ($Version -eq 'latest') {
+  try {
+    Write-Info "Detecting fork version..."
+    $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
+    $forkTag = $resp.tag_name
+    $officialVersion = Get-OfficialVersionFromTag -Tag $forkTag
+    if ($officialVersion) {
+      Write-Info "Fork version: $forkTag (official Tailscale: $officialVersion)"
+    }
+  } catch { Write-Warn "Could not detect fork version: $($_.Exception.Message)" }
+} else {
+  $officialVersion = Get-OfficialVersionFromTag -Tag $Version
+  if ($officialVersion) {
+    Write-Info "Fork version: $forkTag (official Tailscale: $officialVersion)"
+  }
+}
+
+# Check if we need to install or upgrade official Tailscale
 $needsServiceCreate = $false
+$needsInstallOrUpgrade = $false
+
 if (-not (Get-Command tailscale.exe -ErrorAction SilentlyContinue) -and -not $svc) {
   Write-Warn 'Tailscale not found. Installing official version...'
-  $installed = $false
-
-  # Detect fork version to match official Tailscale version
-  $officialVersion = $null
-  if ($Version -eq 'latest') {
-    try {
-      Write-Info "Detecting fork version to match official Tailscale..."
-      $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
-      $forkTag = $resp.tag_name
-      $officialVersion = Get-OfficialVersionFromTag -Tag $forkTag
-      if ($officialVersion) {
-        Write-Info "Fork version $forkTag -> will install official Tailscale $officialVersion"
-      }
-    } catch { Write-Warn "Could not detect fork version: $($_.Exception.Message)" }
-  } else {
-    $officialVersion = Get-OfficialVersionFromTag -Tag $Version
-    if ($officialVersion) {
-      Write-Info "Will install official Tailscale $officialVersion to match fork $Version"
+  $needsInstallOrUpgrade = $true
+} else {
+  # Tailscale exists, check if GUI version matches fork version
+  $installedVersion = Get-InstalledTailscaleVersion
+  if ($installedVersion -and $officialVersion) {
+    if ($installedVersion -ne $officialVersion) {
+      Write-Warn "Installed Tailscale GUI version ($installedVersion) differs from fork version ($officialVersion)"
+      Write-Info "Will upgrade official Tailscale to $officialVersion to match fork"
+      $needsInstallOrUpgrade = $true
+    } else {
+      Write-Info "Tailscale GUI version ($installedVersion) matches fork; will replace binaries only"
     }
+  } else {
+    Write-Info 'Tailscale found; will replace binaries only'
   }
+}
 
-  # Try winget first (only if no specific version needed, as winget may install latest)
+if ($needsInstallOrUpgrade) {
+  $installed = $false  # Try winget first (only if no specific version needed, as winget may install latest)
   if (-not $officialVersion -and (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
     try {
       & winget install -e --id Tailscale.Tailscale --silent --accept-package-agreements --accept-source-agreements
@@ -247,8 +292,6 @@ if (-not (Get-Command tailscale.exe -ErrorAction SilentlyContinue) -and -not $sv
     New-Item -ItemType Directory -Force -Path $defaultDir | Out-Null
     $needsServiceCreate = $true
   }
-} else {
-  Write-Info 'Tailscale found; will replace binaries only'
 }
 
 $svc = Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
