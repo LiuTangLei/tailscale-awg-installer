@@ -116,17 +116,123 @@ detect_system() {
 	log B "Distribution: ${DISTRO}${PACKAGE_MANAGER:+ (${PACKAGE_MANAGER})}"
 }
 
-# Smart download with fallbacks
-smart_download() {
-	local url="$1" output="$2"
-	# Prefer HTTP/1.1 if supported (avoid some HTTP/2 issues); fallback silently if flag unsupported
-	if command -v curl &>/dev/null; then
-		curl -fsSL ${CURL_HTTP1_FLAG:+${CURL_HTTP1_FLAG}} --max-time 30 "${url}" -o "${output}" 2>/dev/null || true
+# Verify binary file integrity (ELF format, size, executability)
+verify_binary() {
+	local file="$1" name="$2" min_size="${3:-1048576}" # Default minimum 1MB
+
+	# Check file exists
+	if [[ ! -f ${file} ]]; then
+		log R "Binary ${name} not found: ${file}"
+		return 1
 	fi
-	[[ -s ${output} ]] || wget -qO "${output}" --timeout=30 "${url}" 2>/dev/null || {
-		log R "Failed to download: ${url}"
+
+	# Check file is not empty
+	if [[ ! -s ${file} ]]; then
+		log R "Binary ${name} is empty"
+		return 1
+	fi
+
+	# Check file size is reasonable
+	local file_size
+	file_size=$(stat -c%s "${file}" 2>/dev/null || stat -f%z "${file}" 2>/dev/null || echo "0")
+	if [[ ${file_size} -lt ${min_size} ]]; then
+		log R "Binary ${name} too small: ${file_size} bytes (expected >${min_size})"
+		return 1
+	fi
+
+	# Check ELF magic number (first 4 bytes: 0x7f 'E' 'L' 'F')
+	if ! head -c4 "${file}" 2>/dev/null | grep -q $'\x7fELF'; then
+		log R "Binary ${name} is not a valid ELF file"
+		return 1
+	fi
+
+	# Make executable
+	chmod +x "${file}" 2>/dev/null || {
+		log R "Cannot make ${name} executable"
 		return 1
 	}
+
+	# Test if binary can execute (check for corruption/incompatibility)
+	# Try --version first, then --help as fallback
+	if ! "${file}" --version &>/dev/null && ! "${file}" --help &>/dev/null && ! "${file}" -h &>/dev/null; then
+		# Binary exists but cannot execute - likely corrupted or wrong architecture
+		log R "Binary ${name} failed execution test (corrupted or incompatible architecture)"
+
+		# Additional diagnostic with 'file' command if available
+		if command -v file &>/dev/null; then
+			local file_type
+			file_type=$(file -b "${file}" 2>/dev/null || echo "unknown")
+			log R "File type: ${file_type}"
+
+			# Check if it's actually an executable for current architecture
+			if [[ ! ${file_type} =~ ELF.*executable ]]; then
+				log R "Not a valid executable for this system"
+				return 1
+			fi
+
+			# Check architecture match
+			local current_arch
+			current_arch=$(uname -m)
+			if [[ ${current_arch} == "x86_64" && ! ${file_type} =~ (x86-64|x86_64|amd64) ]]; then
+				log R "Architecture mismatch: binary is not x86_64"
+				return 1
+			elif [[ ${current_arch} == "aarch64" && ! ${file_type} =~ (aarch64|ARM.*64) ]]; then
+				log R "Architecture mismatch: binary is not ARM64"
+				return 1
+			fi
+		fi
+
+		return 1
+	fi
+
+	# All checks passed
+	return 0
+}
+
+# Smart download with fallbacks and integrity verification
+smart_download() {
+	local url="$1" output="$2" min_size="${3:-1048576}" # Default minimum 1MB
+	local download_success=false
+
+	# Remove any partial/existing file first
+	[[ -f ${output} ]] && rm -f "${output}"
+
+	# Try curl first (with proper error checking)
+	if command -v curl &>/dev/null; then
+		if curl -fsSL ${CURL_HTTP1_FLAG:+${CURL_HTTP1_FLAG}} --max-time 60 --retry 2 "${url}" -o "${output}" 2>&1; then
+			download_success=true
+		fi
+	fi
+
+	# Fallback to wget if curl failed or unavailable
+	if [[ ${download_success} == false ]] && command -v wget &>/dev/null; then
+		rm -f "${output}" 2>/dev/null || true
+		if wget -q --show-progress --timeout=60 --tries=2 -O "${output}" "${url}" 2>&1; then
+			download_success=true
+		fi
+	fi
+
+	# Verify download succeeded
+	if [[ ${download_success} == false ]]; then
+		log R "Download failed: ${url}"
+		return 1
+	fi
+
+	# Verify file exists and has minimum size
+	if [[ ! -f ${output} ]]; then
+		log R "Downloaded file not found: ${output}"
+		return 1
+	fi
+
+	local file_size
+	file_size=$(stat -c%s "${output}" 2>/dev/null || stat -f%z "${output}" 2>/dev/null || echo "0")
+	if [[ ${file_size} -lt ${min_size} ]]; then
+		log R "Downloaded file too small: ${file_size} bytes (expected >${min_size})"
+		rm -f "${output}"
+		return 1
+	fi
+
+	return 0
 }
 
 # Install official Tailscale if missing
@@ -269,37 +375,34 @@ install_binaries() {
 
 	tmp_dir=$(mktemp -d)
 	TMP_DIRS+=("${tmp_dir}")
-	log B "Downloading Amnezia-WG binaries..."
-	smart_download "${base_url}/tailscale-${platform}" "${tmp_dir}/tailscale" &&
-		smart_download "${base_url}/tailscaled-${platform}" "${tmp_dir}/tailscaled" || {
-		log R "Download failed"
-		exit 1
-	}
 
-	local ok=true f
-	for f in tailscale tailscaled; do
-		if [[ ! -s "${tmp_dir}/${f}" ]]; then
-			log R "File ${f} empty"
-			ok=false
-		elif ! head -c4 "${tmp_dir}/${f}" 2>/dev/null | grep -q $'\x7fELF'; then
-			log R "File ${f} not ELF"
-			ok=false
-		else
-			# Verify it contains Amnezia-WG signature (awg command support)
-			# Note: This is a best-effort check and may have false negatives
-			if [[ ${f} == "tailscale" ]] && command -v strings &>/dev/null; then
-				if ! strings "${tmp_dir}/${f}" 2>/dev/null | grep -qi "amnezia\|awg"; then
-					# Suppress warning as it's often a false positive (AWG may be embedded differently)
-					: # log Y "Debug: ${f} AWG signature not detected via strings (may be false negative)"
-				fi
-			fi
-		fi
-		chmod 755 "${tmp_dir}/${f}" 2>/dev/null || true
-	done
-	[[ ${ok} == false ]] && {
-		log R "Binary validation failed"
+	log B "Downloading Amnezia-WG binaries..."
+
+	# Download binaries with integrity checks (minimum 5MB for tailscale binaries)
+	if ! smart_download "${base_url}/tailscale-${platform}" "${tmp_dir}/tailscale" 5242880; then
+		log R "Failed to download tailscale binary"
 		exit 1
-	}
+	fi
+
+	if ! smart_download "${base_url}/tailscaled-${platform}" "${tmp_dir}/tailscaled" 5242880; then
+		log R "Failed to download tailscaled binary"
+		exit 1
+	fi
+
+	log B "Verifying binary integrity..."
+
+	# Verify both binaries (minimum 5MB)
+	if ! verify_binary "${tmp_dir}/tailscale" "tailscale" 5242880; then
+		log R "tailscale binary validation failed"
+		exit 1
+	fi
+
+	if ! verify_binary "${tmp_dir}/tailscaled" "tailscaled" 5242880; then
+		log R "tailscaled binary validation failed"
+		exit 1
+	fi
+
+	log G "Binary validation passed"
 
 	# Stop running service if active (quieter helper)
 	stop_disable_tailscaled || true
