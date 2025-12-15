@@ -27,6 +27,7 @@
 | Linux | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh \| bash` |
 | macOS* | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash` |
 | Windows | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
+| OpenWrt | См. [Установка OpenWrt](#установка-openwrt) ниже |
 | Android | Загрузите APK из [releases](https://github.com/LiuTangLei/tailscale-android/releases) |
 
 macOS: скрипт использует CLI tailscaled; если обнаружен официальный Tailscale.app, вам предложат удалить его, чтобы избежать конфликтов.
@@ -34,6 +35,22 @@ macOS: скрипт использует CLI tailscaled; если обнаруж
 Android может «получать» конфигурацию AWG с другого узла (кнопка Sync в приложении).
 
 ![Пример синхронизации AWG на Android](sync1.jpg)
+
+### Установка OpenWrt
+
+Для устройств OpenWrt используйте следующую команду:
+
+```bash
+wget -O /usr/bin/install.sh https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install_en.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh --notiny
+```
+
+Для китайских пользователей или регионов с ограниченным доступом к GitHub используйте зеркало с интерактивной установкой:
+
+```bash
+wget -O /usr/bin/install.sh https://ghfast.top/https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh
+```
+
+Этот скрипт создан на основе [GuNanOvO/openwrt-tailscale](https://github.com/GuNanOvO/openwrt-tailscale). Спасибо GuNanOvO за вклад в open source!
 
 ### Docker Compose
 
@@ -127,6 +144,7 @@ tailscale awg set '{"s1":10,"s2":15,"s3":8,"s4":0,"h1":{"min":100000,"max":20000
 | Linux | x86_64, ARM64 | ✅ Полная |
 | macOS | Intel, Apple Silicon | ✅ Полная |
 | Windows | x86_64, ARM64 | ✅ Установщик |
+| OpenWrt | Различные | ✅ Скрипт |
 | Android | ARM64, ARM | ✅ APK (только синхронизация AWG) |
 
 ## Миграция с 1.x

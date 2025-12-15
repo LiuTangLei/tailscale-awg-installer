@@ -26,6 +26,7 @@
 | لینوکس | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh \| bash` |
 | macOS* | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash` |
 | ویندوز | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
+| OpenWrt | [نصب OpenWrt](#نصب-openwrt) را ببینید |
 | اندروید | دانلود APK از [releases](https://github.com/LiuTangLei/tailscale-android/releases) |
 
 macOS: اسکریپت از نسخه CLI tailscaled استفاده می‌کند؛ اگر Tailscale.app رسمی پیدا شود، برای جلوگیری از تداخل پیشنهاد حذف می‌دهد.
@@ -33,6 +34,22 @@ macOS: اسکریپت از نسخه CLI tailscaled استفاده می‌کند�
 اندروید می‌تواند پیکربندی AWG را از یک گره دیگر «دریافت» کند (دکمه Sync).
 
 ![Android Sync](sync1.jpg)
+
+### نصب OpenWrt
+
+برای دستگاه‌های OpenWrt از دستور زیر استفاده کنید:
+
+```bash
+wget -O /usr/bin/install.sh https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install_en.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh --notiny
+```
+
+برای کاربران چینی یا مناطقی با دسترسی محدود به GitHub، از آینه با نصب تعاملی استفاده کنید:
+
+```bash
+wget -O /usr/bin/install.sh https://ghfast.top/https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh
+```
+
+این اسکریپت از [GuNanOvO/openwrt-tailscale](https://github.com/GuNanOvO/openwrt-tailscale) فورک شده است. با تشکر از GuNanOvO برای مشارکت متن‌باز!
 
 ### Docker Compose
 
@@ -126,6 +143,7 @@ tailscale awg set '{"s1":10,"s2":15,"s3":8,"s4":0,"h1":{"min":100000,"max":20000
 | لینوکس | x86_64, ARM64 | ✅ کامل |
 | macOS | Intel, Apple Silicon | ✅ کامل |
 | ویندوز | x86_64, ARM64 | ✅ نصب‌کننده |
+| OpenWrt | متنوع | ✅ اسکریپت |
 | اندروید | ARM64, ARM | ✅ APK (فقط همگام‌سازی AWG) |
 
 ## مهاجرت از 1.x

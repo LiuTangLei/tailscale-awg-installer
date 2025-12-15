@@ -25,6 +25,7 @@ AWG 1.5 旧文档： [README-awg-v1.5.md](README-awg-v1.5.md)
 | Linux   | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh \| bash` |
 | macOS*  | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash` |
 | Windows | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
+| OpenWrt | 参见下方 [OpenWrt 安装](#openwrt-安装) |
 | Android | 从 [releases](https://github.com/LiuTangLei/tailscale-android/releases) 下载 APK |
 
 macOS：脚本使用 CLI 版 tailscaled，如检测到官方 Tailscale.app，将提示移除以避免冲突。
@@ -32,6 +33,22 @@ macOS：脚本使用 CLI 版 tailscaled，如检测到官方 Tailscale.app，将
 Android 支持从其它已配置节点"接收"AWG 配置（应用内点 Sync）。
 
 ![Android 同步示例](sync1.jpg)
+
+### OpenWrt 安装
+
+对于 OpenWrt 设备，中文用户或 GitHub 受限地区可使用以下命令进行交互式安装：
+
+```bash
+wget -O /usr/bin/install.sh https://ghfast.top/https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh
+```
+
+英文版安装命令：
+
+```bash
+wget -O /usr/bin/install.sh https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install_en.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh --notiny
+```
+
+此脚本 fork 自 [GuNanOvO/openwrt-tailscale](https://github.com/GuNanOvO/openwrt-tailscale)，感谢 GuNanOvO 的开源贡献！
 
 ### Docker Compose
 
@@ -155,6 +172,7 @@ tailscale awg set '{"s1":10,"s2":15,"s3":8,"s4":0,"h1":{"min":100000,"max":20000
 | Linux   | x86_64, ARM64        | ✅ 完整             |
 | macOS   | Intel, Apple Silicon | ✅ 完整             |
 | Windows | x86_64, ARM64        | ✅ 安装器           |
+| OpenWrt | 多种架构             | ✅ 脚本             |
 | Android | ARM64, ARM           | ✅ APK（仅同步 AWG） |
 
 ## 从 1.x 迁移

@@ -29,6 +29,7 @@ If you were on AWG 1.x, reconfigure all nodes after upgrading. See “Migration 
 | Linux                      | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh \| bash`  |
 | macOS*                     | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash`  |
 | Windows (Admin PowerShell) | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
+| OpenWrt                    | See [OpenWrt Installation](#openwrt-installation) below                                                          |
 | Android                    | Download APK: [releases](https://github.com/LiuTangLei/tailscale-android/releases)                               |
 
 macOS note: Due to system integrity protections, the installer uses CLI-only Tailscale. If the official Tailscale.app is detected, you'll be prompted to remove it to avoid conflicts.
@@ -36,6 +37,22 @@ macOS note: Due to system integrity protections, the installer uses CLI-only Tai
 Android build currently supports AWG config sync (receive) from another configured node. Use the in‑app Sync button:
 
 ![Android AWG Sync Example](doc/sync1.jpg)
+
+### OpenWrt Installation
+
+For OpenWrt devices, use the following command:
+
+```bash
+wget -O /usr/bin/install.sh https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install_en.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh --notiny
+```
+
+For Chinese users or regions with restricted GitHub access, use the mirror with interactive installation:
+
+```bash
+wget -O /usr/bin/install.sh https://ghfast.top/https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh
+```
+
+This script is forked from [GuNanOvO/openwrt-tailscale](https://github.com/GuNanOvO/openwrt-tailscale). Thanks to GuNanOvO for the open source contribution!
 
 ### Docker Compose
 
@@ -168,6 +185,7 @@ Notes: very large junk counts or long signature chains increase latency & bandwi
 | Linux    | x86_64, ARM64        | ✅ Full                |
 | macOS    | Intel, Apple Silicon | ✅ Full                |
 | Windows  | x86_64, ARM64        | ✅ Installer           |
+| OpenWrt  | Various              | ✅ Script              |
 | Android  | ARM64, ARM           | ✅ APK (sync-only AWG) |
 
 ## � Migration to 2.0 (from 1.x)
