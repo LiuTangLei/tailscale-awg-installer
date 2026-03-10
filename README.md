@@ -43,7 +43,7 @@ Android build currently supports AWG config sync (receive) from another configur
 For OpenWrt devices, use the following command:
 
 ```bash
-wget -O /usr/bin/install.sh https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install_en.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh --notiny
+wget -O /usr/bin/install.sh https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install_en.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh
 ```
 
 For Chinese users or regions with restricted GitHub access, use the mirror with interactive installation:

@@ -41,7 +41,7 @@ Android может «получать» конфигурацию AWG с друг
 Для устройств OpenWrt используйте следующую команду:
 
 ```bash
-wget -O /usr/bin/install.sh https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install_en.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh --notiny
+wget -O /usr/bin/install.sh https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install_en.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh
 ```
 
 Для китайских пользователей или регионов с ограниченным доступом к GitHub используйте зеркало с интерактивной установкой:
