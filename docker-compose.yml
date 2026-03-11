@@ -11,8 +11,7 @@ services:
     stdin_open: true
     tty: true
     volumes:
-      - /var/lib/tailscale:/var/lib/tailscale
-      - /var/run/tailscale:/var/run/tailscale
+      - ./tailscale-state:/var/lib/tailscale
     environment:
       - TS_SOCKET=/var/run/tailscale/tailscaled.sock
     command: >
