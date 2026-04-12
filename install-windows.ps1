@@ -12,6 +12,7 @@ param(
   [string]$Version = 'latest',
   [string]$InstallDir,
   [switch]$EnableMsiFallback = $true,
+  [switch]$PreRelease,
   [string]$MirrorPrefix = ''
 )
 
@@ -218,7 +219,11 @@ $forkTag = $Version
 if ($Version -eq 'latest') {
   try {
     Write-Info "Detecting fork version..."
-    $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
+    if ($PreRelease) {
+      $resp = (Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases?per_page=1")[0]
+    } else {
+      $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
+    }
     $forkTag = $resp.tag_name
     $officialVersion = Get-OfficialVersionFromTag -Tag $forkTag
     if ($officialVersion) {
@@ -333,14 +338,18 @@ Start-Sleep -Milliseconds 800
 if ($Version -eq 'latest') {
   if ($forkTag -and $forkTag -ne 'latest') {
     $Version = $forkTag
-    Write-Info "Latest: $Version"
+    Write-Info "Latest$(if ($PreRelease) { ' (pre-release)' }): $Version"
   } else {
     Write-Info 'Resolving latest release...'
     try {
-      $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
+      if ($PreRelease) {
+        $resp = (Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases?per_page=1")[0]
+      } else {
+        $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
+      }
       $Version = $resp.tag_name
       if (-not $Version) { throw 'No tag_name in response' }
-      Write-Info "Latest: $Version"
+      Write-Info "Latest$(if ($PreRelease) { ' (pre-release)' }): $Version"
     } catch {
       Write-Err "Failed to resolve latest release: $($_.Exception.Message)"
       exit 1

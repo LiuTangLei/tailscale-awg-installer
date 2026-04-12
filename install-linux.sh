@@ -59,7 +59,7 @@ stop_disable_tailscaled() {
 }
 
 # Global variables
-DISTRO="" PACKAGE_MANAGER="" SUDO="" RELEASE_TAG="latest" MIRROR_PREFIX="" FALLBACK_BINARY=false ACTION="install" OFFICIAL_VERSION=""
+DISTRO="" PACKAGE_MANAGER="" SUDO="" RELEASE_TAG="latest" MIRROR_PREFIX="" FALLBACK_BINARY=false ACTION="install" OFFICIAL_VERSION="" PRE_RELEASE=false
 TMP_DIRS=()
 CURL_HTTP1_FLAG=""
 
@@ -288,36 +288,57 @@ install_tailscale() {
 	fi
 }
 
-# Reinstall specific Tailscale version via package manager
+# Reinstall specific Tailscale version via package manager (with patch-level fallback)
 reinstall_specific_version() {
 	local version="$1"
 	[[ -z ${version} ]] && return
 
+	# Build list of versions to try: exact version first, then lower patch versions
+	local versions_to_try=("${version}")
+	if [[ ${version} =~ ^([0-9]+\.[0-9]+)\.([0-9]+)$ ]]; then
+		local major_minor="${BASH_REMATCH[1]}"
+		local patch="${BASH_REMATCH[2]}"
+		local p
+		for ((p = patch - 1; p >= 0; p--)); do
+			versions_to_try+=("${major_minor}.${p}")
+		done
+	fi
+
 	log B "Installing Tailscale ${version} via package manager..."
-	case "${DISTRO}" in
-	debian)
-		${SUDO} apt-get update &>/dev/null || true
-		${SUDO} apt-get install -y --allow-downgrades tailscale="${version}" 2>/dev/null ||
-			log Y "Failed to install exact version ${version}, continuing with installed version"
-		;;
-	redhat)
-		if command -v dnf &>/dev/null; then
-			${SUDO} dnf install -y tailscale-"${version}" 2>/dev/null ||
-				log Y "Failed to install exact version ${version}, continuing with installed version"
-		elif command -v yum &>/dev/null; then
-			${SUDO} yum install -y tailscale-"${version}" 2>/dev/null ||
-				log Y "Failed to install exact version ${version}, continuing with installed version"
+	local installed=false
+	for try_ver in "${versions_to_try[@]}"; do
+		if [[ ${try_ver} != "${version}" ]]; then
+			log Y "Exact version ${version} not available, trying ${try_ver}..."
 		fi
-		;;
-	suse)
-		${SUDO} zypper --non-interactive install --force tailscale="${version}" 2>/dev/null ||
-			log Y "Failed to install exact version ${version}, continuing with installed version"
-		;;
-	# arch, alpine use rolling/latest, version pinning not typically supported
-	*)
-		log Y "Version pinning not supported for ${DISTRO}, using installed version"
-		;;
-	esac
+		case "${DISTRO}" in
+		debian)
+			${SUDO} apt-get update &>/dev/null || true
+			if ${SUDO} apt-get install -y --allow-downgrades tailscale="${try_ver}" 2>/dev/null; then
+				installed=true
+			fi
+			;;
+		redhat)
+			if command -v dnf &>/dev/null; then
+				${SUDO} dnf install -y tailscale-"${try_ver}" 2>/dev/null && installed=true
+			elif command -v yum &>/dev/null; then
+				${SUDO} yum install -y tailscale-"${try_ver}" 2>/dev/null && installed=true
+			fi
+			;;
+		suse)
+			${SUDO} zypper --non-interactive install --force tailscale="${try_ver}" 2>/dev/null && installed=true
+			;;
+		# arch, alpine use rolling/latest, version pinning not typically supported
+		*)
+			log Y "Version pinning not supported for ${DISTRO}, using installed version"
+			return
+			;;
+		esac
+		if [[ ${installed} == true ]]; then
+			[[ ${try_ver} != "${version}" ]] && log G "Installed Tailscale ${try_ver} (closest match to ${version})"
+			return
+		fi
+	done
+	log Y "Failed to install Tailscale ${version} (or any lower patch version), continuing with installed version"
 }
 
 # Get latest version from GitHub API and extract official version
@@ -330,7 +351,14 @@ get_version() {
 		return
 	fi
 
-	local api_url="https://api.github.com/repos/${REPO}/releases/latest" tag_name=""
+	# Use different API endpoint for pre-release vs stable
+	local api_url tag_name=""
+	if [[ ${PRE_RELEASE} == true ]]; then
+		# List all releases and pick the first one (which may be a pre-release)
+		api_url="https://api.github.com/repos/${REPO}/releases?per_page=1"
+	else
+		api_url="https://api.github.com/repos/${REPO}/releases/latest"
+	fi
 	if command -v curl &>/dev/null; then
 		tag_name=$(curl -fsSL ${CURL_HTTP1_FLAG:+${CURL_HTTP1_FLAG}} --max-time 15 "${api_url}" | grep '"tag_name":' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/' | head -1)
 	elif command -v wget &>/dev/null; then
@@ -566,6 +594,10 @@ main() {
 			RELEASE_TAG="$2"
 			shift 2
 			;;
+		--pre-release)
+			PRE_RELEASE=true
+			shift
+			;;
 		--mirror)
 			MIRROR_PREFIX="$2"
 			shift 2
@@ -580,6 +612,7 @@ Usage: $0 [OPTIONS]
 Options:
   --mirror PREFIX     Use GitHub mirror
   --version TAG       Use specific GitHub release tag (e.g. v1.68.2)
+  --pre-release      Install the latest pre-release version from GitHub
   --uninstall        Remove Tailscale (packages, binaries, config, state) and exit
   --help, -h         Show this help
 EOF

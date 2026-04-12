@@ -15,6 +15,7 @@ set -euo pipefail
 REPO="LiuTangLei/tailscale"
 VERSION="latest"
 MIRROR_PREFIX="" # GitHub mirror prefix
+PRE_RELEASE=false
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -388,7 +389,12 @@ install_official_if_missing() {
 install_binaries() {
 	if [[ ${VERSION} == "latest" ]]; then
 		info "Fetching latest release tag..."
-		local api_url="https://api.github.com/repos/${REPO}/releases/latest"
+		local api_url
+		if [[ ${PRE_RELEASE} == true ]]; then
+			api_url="https://api.github.com/repos/${REPO}/releases?per_page=1"
+		else
+			api_url="https://api.github.com/repos/${REPO}/releases/latest"
+		fi
 		local tag
 		tag=$(curl -fsSL "${api_url}" | grep '"tag_name"' | sed -E 's/.*"([^\"]+)".*/\1/')
 		[[ -z ${tag} ]] && {
@@ -396,7 +402,11 @@ install_binaries() {
 			exit 1
 		}
 		VERSION="${tag}"
-		info "Latest version: ${VERSION}"
+		if [[ ${PRE_RELEASE} == true ]]; then
+			info "Latest version (pre-release): ${VERSION}"
+		else
+			info "Latest version: ${VERSION}"
+		fi
 	fi
 
 	local base_url="https://github.com/${REPO}/releases/download/${VERSION}"
@@ -570,6 +580,14 @@ main() {
 			info "Using mirror: ${MIRROR_PREFIX}"
 			shift 2
 			;;
+		--version)
+			VERSION="$2"
+			shift 2
+			;;
+		--pre-release)
+			PRE_RELEASE=true
+			shift
+			;;
 		--uninstall)
 			ACTION="uninstall"
 			shift
@@ -579,6 +597,8 @@ main() {
 Usage: $0 [OPTIONS]
 Options:
   --mirror PREFIX    Use GitHub mirror with specified prefix
+  --version TAG      Use specific GitHub release tag (e.g. v1.68.2)
+  --pre-release     Install the latest pre-release version from GitHub
   --uninstall       Remove Tailscale (all variants, binaries, config, state) and exit
   --help, -h        Show this help
 
