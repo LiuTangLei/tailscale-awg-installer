@@ -15,12 +15,6 @@ param(
   [string]$MirrorPrefix = ''
 )
 
-# Support environment variable override for one-liner usage
-if ([string]::IsNullOrEmpty($MirrorPrefix) -and $env:MIRROR_PREFIX) {
-  $MirrorPrefix = $env:MIRROR_PREFIX
-  Write-Info "Using mirror from environment: $MirrorPrefix"
-}
-
 $ErrorActionPreference = 'Stop'
 
 #region Output Functions
@@ -29,6 +23,12 @@ function Write-Ok($m) { Write-Host "[SUCCESS] $m" -ForegroundColor Green }
 function Write-Warn($m) { Write-Host "[WARNING] $m" -ForegroundColor Yellow }
 function Write-Err($m) { Write-Host "[ERROR] $m" -ForegroundColor Red }
 #endregion
+
+# Support environment variable override for one-liner usage
+if ([string]::IsNullOrEmpty($MirrorPrefix) -and $env:MIRROR_PREFIX) {
+  $MirrorPrefix = $env:MIRROR_PREFIX
+  Write-Info "Using mirror from environment: $MirrorPrefix"
+}
 
 #region System Validation
 # Basic compatibility setup
@@ -267,23 +267,35 @@ if ($needsInstallOrUpgrade) {
 
   # Try MSI if winget failed/skipped and enabled
   if (-not $installed -and $EnableMsiFallback) {
-    # Use version-specific URL if detected, otherwise use latest
-    if ($officialVersion) {
-      $msiUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-$officialVersion-$arch.msi"
-    } else {
-      $msiUrl = if ($arch -eq 'amd64') { 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' } else { 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-arm64.msi' }
-    }
-    try {
-      Write-Warn "Trying MSI installer from $msiUrl..."
-      $tmpMsi = "$env:TEMP\tailscale-$([guid]::NewGuid()).msi"
-      Invoke-WebRequestCompat -Uri $msiUrl -OutFile $tmpMsi
-      $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$tmpMsi`"", '/qn', '/norestart') -Wait -PassThru
-      if ($p.ExitCode -in 0, 3010) {
-        Start-Sleep -Seconds 3
-        $installed = [bool](Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue)
+    # Build list of MSI URLs to try: if we have a specific version, try it and lower patch versions
+    $msiUrls = @()
+    if ($officialVersion -and $officialVersion -match '^(\d+\.\d+)\.(\d+)$') {
+      $majorMinor = $Matches[1]
+      $patch = [int]$Matches[2]
+      for ($p = $patch; $p -ge 0; $p--) {
+        $msiUrls += "https://pkgs.tailscale.com/stable/tailscale-setup-$majorMinor.$p-$arch.msi"
       }
-      Remove-Item -Force $tmpMsi -ErrorAction SilentlyContinue
-    } catch { Write-Warn "MSI failed: $($_.Exception.Message)" }
+    } else {
+      $msiUrls += if ($arch -eq 'amd64') { 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' } else { 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-arm64.msi' }
+    }
+
+    foreach ($msiUrl in $msiUrls) {
+      if ($installed) { break }
+      try {
+        Write-Info "Trying MSI installer from $msiUrl..."
+        $tmpMsi = "$env:TEMP\tailscale-$([guid]::NewGuid()).msi"
+        Invoke-WebRequestCompat -Uri $msiUrl -OutFile $tmpMsi
+        $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$tmpMsi`"", '/qn', '/norestart') -Wait -PassThru
+        if ($p.ExitCode -in 0, 3010) {
+          Start-Sleep -Seconds 3
+          $installed = [bool](Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue)
+        }
+        Remove-Item -Force $tmpMsi -ErrorAction SilentlyContinue
+      } catch {
+        Write-Warn "MSI download failed for $msiUrl : $($_.Exception.Message)"
+        Remove-Item -Force $tmpMsi -ErrorAction SilentlyContinue
+      }
+    }
   }
 
   # Fallback to minimal install
@@ -317,17 +329,22 @@ Get-Process -Name 'tailscaled','tailscale','tailscale-ipn' -ErrorAction Silently
   Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 800
 
-# Resolve version and download URLs
+# Resolve version and download URLs (reuse forkTag if already resolved)
 if ($Version -eq 'latest') {
-  Write-Info 'Resolving latest release...'
-  try {
-    $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
-    $Version = $resp.tag_name
-    if (-not $Version) { throw 'No tag_name in response' }
+  if ($forkTag -and $forkTag -ne 'latest') {
+    $Version = $forkTag
     Write-Info "Latest: $Version"
-  } catch {
-    Write-Err "Failed to resolve latest release: $($_.Exception.Message)"
-    exit 1
+  } else {
+    Write-Info 'Resolving latest release...'
+    try {
+      $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
+      $Version = $resp.tag_name
+      if (-not $Version) { throw 'No tag_name in response' }
+      Write-Info "Latest: $Version"
+    } catch {
+      Write-Err "Failed to resolve latest release: $($_.Exception.Message)"
+      exit 1
+    }
   }
 }
 
