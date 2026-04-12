@@ -220,7 +220,12 @@ if ($Version -eq 'latest') {
   try {
     Write-Info "Detecting fork version..."
     if ($PreRelease) {
-      $resp = (Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases?per_page=1")[0]
+      $allReleases = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases?per_page=10"
+      $resp = $allReleases | Where-Object { $_.prerelease -eq $true } | Select-Object -First 1
+      if (-not $resp) {
+        Write-Warn "No pre-release found, falling back to latest stable"
+        $resp = $allReleases | Select-Object -First 1
+      }
     } else {
       $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
     }
@@ -343,7 +348,9 @@ if ($Version -eq 'latest') {
     Write-Info 'Resolving latest release...'
     try {
       if ($PreRelease) {
-        $resp = (Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases?per_page=1")[0]
+        $allReleases = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases?per_page=10"
+        $resp = $allReleases | Where-Object { $_.prerelease -eq $true } | Select-Object -First 1
+        if (-not $resp) { $resp = $allReleases | Select-Object -First 1 }
       } else {
         $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
       }

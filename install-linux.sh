@@ -351,21 +351,37 @@ get_version() {
 		return
 	fi
 
-	# Use different API endpoint for pre-release vs stable
-	local api_url tag_name=""
+	local tag_name=""
 	if [[ ${PRE_RELEASE} == true ]]; then
-		# List all releases and pick the first one (which may be a pre-release)
-		api_url="https://api.github.com/repos/${REPO}/releases?per_page=1"
+		# Fetch multiple releases and find the first one marked as pre-release
+		# GitHub API ordering is not strictly chronological, so we search for "prerelease": true
+		local api_url="https://api.github.com/repos/${REPO}/releases?per_page=10"
+		local response=""
+		if command -v curl &>/dev/null; then
+			response=$(curl -fsSL ${CURL_HTTP1_FLAG:+${CURL_HTTP1_FLAG}} --max-time 15 "${api_url}")
+		elif command -v wget &>/dev/null; then
+			response=$(wget -qO- --timeout=15 "${api_url}")
+		else
+			log R "curl or wget required to fetch version" >&2
+			exit 1
+		fi
+		# Extract tag_name from the first release block that has "prerelease": true
+		# In GitHub JSON, tag_name appears before prerelease in each release object
+		tag_name=$(echo "${response}" | grep -B30 '"prerelease": *true' | grep '"tag_name":' | tail -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+		if [[ -z ${tag_name} ]]; then
+			log Y "No pre-release found, falling back to latest stable" >&2
+			tag_name=$(echo "${response}" | grep '"tag_name":' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+		fi
 	else
-		api_url="https://api.github.com/repos/${REPO}/releases/latest"
-	fi
-	if command -v curl &>/dev/null; then
-		tag_name=$(curl -fsSL ${CURL_HTTP1_FLAG:+${CURL_HTTP1_FLAG}} --max-time 15 "${api_url}" | grep '"tag_name":' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/' | head -1)
-	elif command -v wget &>/dev/null; then
-		tag_name=$(wget -qO- --timeout=15 "${api_url}" | grep '"tag_name":' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/' | head -1)
-	else
-		log R "curl or wget required to fetch version" >&2
-		exit 1
+		local api_url="https://api.github.com/repos/${REPO}/releases/latest"
+		if command -v curl &>/dev/null; then
+			tag_name=$(curl -fsSL ${CURL_HTTP1_FLAG:+${CURL_HTTP1_FLAG}} --max-time 15 "${api_url}" | grep '"tag_name":' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/' | head -1)
+		elif command -v wget &>/dev/null; then
+			tag_name=$(wget -qO- --timeout=15 "${api_url}" | grep '"tag_name":' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/' | head -1)
+		else
+			log R "curl or wget required to fetch version" >&2
+			exit 1
+		fi
 	fi
 
 	if [[ -z ${tag_name} || ! ${tag_name} =~ ^v[0-9]+\.[0-9]+ ]]; then

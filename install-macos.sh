@@ -389,14 +389,19 @@ install_official_if_missing() {
 install_binaries() {
 	if [[ ${VERSION} == "latest" ]]; then
 		info "Fetching latest release tag..."
-		local api_url
-		if [[ ${PRE_RELEASE} == true ]]; then
-			api_url="https://api.github.com/repos/${REPO}/releases?per_page=1"
-		else
-			api_url="https://api.github.com/repos/${REPO}/releases/latest"
-		fi
 		local tag
-		tag=$(curl -fsSL "${api_url}" | grep '"tag_name"' | sed -E 's/.*"([^\"]+)".*/\1/')
+		if [[ ${PRE_RELEASE} == true ]]; then
+			# Fetch multiple releases and find the first one marked as pre-release
+			local response
+			response=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=10")
+			tag=$(echo "${response}" | grep -B30 '"prerelease": *true' | grep '"tag_name"' | tail -1 | sed -E 's/.*"([^\"]+)".*/\1/')
+			if [[ -z ${tag} ]]; then
+				warn "No pre-release found, falling back to latest stable"
+				tag=$(echo "${response}" | grep '"tag_name"' | head -1 | sed -E 's/.*"([^\"]+)".*/\1/')
+			fi
+		else
+			tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^\"]+)".*/\1/')
+		fi
 		[[ -z ${tag} ]] && {
 			err "Failed to resolve latest release"
 			exit 1
