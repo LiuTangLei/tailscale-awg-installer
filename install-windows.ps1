@@ -114,11 +114,13 @@ function Get-ReleasePublishedAt($Release) {
 }
 
 function Select-HighestVersionRelease($Releases, [bool]$Prerelease) {
-  $filtered = @($Releases | Where-Object { $_.prerelease -eq $Prerelease -and $_.tag_name -match '^v?\d+\.\d+\.\d+' })
-  if (-not $filtered -or $filtered.Count -eq 0) { return $null }
-  return $filtered |
-    Sort-Object -Property @{ Expression = { Get-VersionObjectFromTag -Tag $_.tag_name }; Descending = $true }, @{ Expression = { Get-ReleasePublishedAt -Release $_ }; Descending = $true } |
-    Select-Object -First 1
+  $sorted = @(
+    $Releases |
+      Where-Object { $_.prerelease -eq $Prerelease -and $_.tag_name -match '^v?\d+\.\d+\.\d+' } |
+      Sort-Object -Property @{ Expression = { Get-VersionObjectFromTag -Tag $_.tag_name }; Descending = $true }, @{ Expression = { Get-ReleasePublishedAt -Release $_ }; Descending = $true }
+  )
+  if ($sorted.Count -eq 0) { return $null }
+  return $sorted[0]
 }
 
 function Get-ExePathFromCommandLine([string]$CommandLine) {
@@ -402,8 +404,8 @@ $tsUrl = $tsdUrl = $null
 try {
   $rel = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/tags/$Version"
   $ap = if ($arch -eq 'amd64') { 'amd64|x86_64|x64' } else { 'arm64|aarch64' }
-  $ts = $rel.assets | Where-Object { $_.name -match "(?i)tailscale(?!d).*($ap).*(windows|win).*\.exe$" } | Select-Object -First 1
-  $tsd = $rel.assets | Where-Object { $_.name -match "(?i)tailscaled.*($ap).*(windows|win).*\.exe$" } | Select-Object -First 1
+  $ts = $rel.assets | Where-Object { $_.name -match '(?i)^tailscale.*\.exe$' -and $_.name -notmatch '(?i)^tailscaled' -and $_.name -match '(?i)(windows|win)' -and $_.name -match "(?i)($ap)" } | Select-Object -First 1
+  $tsd = $rel.assets | Where-Object { $_.name -match '(?i)^tailscaled.*\.exe$' -and $_.name -match '(?i)(windows|win)' -and $_.name -match "(?i)($ap)" } | Select-Object -First 1
   if ($ts -and $tsd) {
     $tsUrl = if ($MirrorPrefix) { $ts.browser_download_url -replace '^https://github\.com', $MirrorPrefix + '/https://github.com' } else { $ts.browser_download_url }
     $tsdUrl = if ($MirrorPrefix) { $tsd.browser_download_url -replace '^https://github\.com', $MirrorPrefix + '/https://github.com' } else { $tsd.browser_download_url }
