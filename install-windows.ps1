@@ -88,6 +88,15 @@ function Invoke-WebRequestCompat([string]$Uri, [string]$OutFile) {
   }
   Invoke-WebRequest @p
 }
+
+function Add-MirrorPrefixToGitHubUrl([string]$Uri) {
+  if ([string]::IsNullOrWhiteSpace($Uri) -or -not $MirrorPrefix) { return $Uri }
+  $githubPrefix = 'https://github.com'
+  if ($Uri.StartsWith($githubPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    return "$MirrorPrefix/$githubPrefix$($Uri.Substring($githubPrefix.Length))"
+  }
+  return $Uri
+}
 #endregion
 
 #region Service Management Functions
@@ -113,14 +122,26 @@ function Get-ReleasePublishedAt($Release) {
   return [datetime]::MinValue
 }
 
+function Select-FirstItem($Value) {
+  $items = @($Value)
+  if ($items.Count -eq 0) { return $null }
+  return $items[0]
+}
+
+function Get-ReleaseTagName($Release) {
+  $firstRelease = Select-FirstItem -Value $Release
+  if (-not $firstRelease) { return $null }
+  return Select-FirstItem -Value $firstRelease.tag_name
+}
+
 function Select-HighestVersionRelease($Releases, [bool]$Prerelease) {
   $sorted = @(
-    $Releases |
+    @($Releases) |
       Where-Object { $_.prerelease -eq $Prerelease -and $_.tag_name -match '^v?\d+\.\d+\.\d+' } |
       Sort-Object -Property @{ Expression = { Get-VersionObjectFromTag -Tag $_.tag_name }; Descending = $true }, @{ Expression = { Get-ReleasePublishedAt -Release $_ }; Descending = $true }
   )
   if ($sorted.Count -eq 0) { return $null }
-  return $sorted[0]
+  return Select-FirstItem -Value $sorted
 }
 
 function Get-ExePathFromCommandLine([string]$CommandLine) {
@@ -253,15 +274,16 @@ if ($Version -eq 'latest') {
     Write-Info "Detecting fork version..."
     if ($PreRelease) {
       $allReleases = @(Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases?per_page=100")
-      $resp = Select-HighestVersionRelease -Releases $allReleases -Prerelease $true
+      $resp = Select-FirstItem -Value (Select-HighestVersionRelease -Releases $allReleases -Prerelease $true)
       if (-not $resp) {
         Write-Warn "No pre-release found, falling back to latest stable"
-        $resp = Select-HighestVersionRelease -Releases $allReleases -Prerelease $false
+        $resp = Select-FirstItem -Value (Select-HighestVersionRelease -Releases $allReleases -Prerelease $false)
       }
     } else {
       $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
     }
-    $forkTag = $resp.tag_name
+    $forkTag = Get-ReleaseTagName -Release $resp
+    if (-not $forkTag) { throw 'No tag_name in response' }
     $officialVersion = Get-OfficialVersionFromTag -Tag $forkTag
     if ($officialVersion) {
       Write-Info "Fork version: $forkTag (official Tailscale: $officialVersion)"
@@ -381,15 +403,15 @@ if ($Version -eq 'latest') {
     try {
       if ($PreRelease) {
         $allReleases = @(Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases?per_page=100")
-        $resp = Select-HighestVersionRelease -Releases $allReleases -Prerelease $true
+        $resp = Select-FirstItem -Value (Select-HighestVersionRelease -Releases $allReleases -Prerelease $true)
         if (-not $resp) {
           Write-Warn "No pre-release found, falling back to latest stable"
-          $resp = Select-HighestVersionRelease -Releases $allReleases -Prerelease $false
+          $resp = Select-FirstItem -Value (Select-HighestVersionRelease -Releases $allReleases -Prerelease $false)
         }
       } else {
         $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
       }
-      $Version = $resp.tag_name
+      $Version = Get-ReleaseTagName -Release $resp
       if (-not $Version) { throw 'No tag_name in response' }
       Write-Info "Latest$(if ($PreRelease) { ' (pre-release)' }): $Version"
     } catch {
@@ -407,8 +429,8 @@ try {
   $ts = $rel.assets | Where-Object { $_.name -match '(?i)^tailscale.*\.exe$' -and $_.name -notmatch '(?i)^tailscaled' -and $_.name -match '(?i)(windows|win)' -and $_.name -match "(?i)($ap)" } | Select-Object -First 1
   $tsd = $rel.assets | Where-Object { $_.name -match '(?i)^tailscaled.*\.exe$' -and $_.name -match '(?i)(windows|win)' -and $_.name -match "(?i)($ap)" } | Select-Object -First 1
   if ($ts -and $tsd) {
-    $tsUrl = if ($MirrorPrefix) { $ts.browser_download_url -replace '^https://github\.com', $MirrorPrefix + '/https://github.com' } else { $ts.browser_download_url }
-    $tsdUrl = if ($MirrorPrefix) { $tsd.browser_download_url -replace '^https://github\.com', $MirrorPrefix + '/https://github.com' } else { $tsd.browser_download_url }
+    $tsUrl = Add-MirrorPrefixToGitHubUrl -Uri $ts.browser_download_url
+    $tsdUrl = Add-MirrorPrefixToGitHubUrl -Uri $tsd.browser_download_url
     Write-Info "Resolved assets: $($ts.name), $($tsd.name)"
   }
 } catch { Write-Warn "Could not resolve assets from release: $($_.Exception.Message)" }
