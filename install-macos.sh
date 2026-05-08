@@ -30,6 +30,71 @@ err() { log "${RED}[ERROR]${NC} $1"; }
 
 check_root() { if [[ ${EUID} -eq 0 ]]; then SUDO=""; else SUDO="sudo"; fi; }
 
+extract_release_tags_by_prerelease() {
+	local prerelease_value="$1"
+	awk -v wanted="${prerelease_value}" '
+		{
+			line = $0
+			while (match(line, /"(tag_name|prerelease)"[[:space:]]*:[[:space:]]*("[^"]*"|true|false)/)) {
+				token = substr(line, RSTART, RLENGTH)
+				if (token ~ /^"tag_name"/) {
+					value = token
+					sub(/.*:[[:space:]]*"/, "", value)
+					sub(/"$/, "", value)
+					tag = value
+				} else {
+					value = token
+					sub(/.*:[[:space:]]*/, "", value)
+					if (tag != "" && value == wanted) print tag
+					tag = ""
+				}
+				line = substr(line, RSTART + RLENGTH)
+			}
+		}
+	'
+}
+
+version_parts() {
+	local tag="$1"
+	if [[ ${tag} =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+		printf '%s %s %s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+		return 0
+	fi
+	return 1
+}
+
+tag_is_newer_than() {
+	local candidate="$1" current="$2"
+	local c_major c_minor c_patch cur_major cur_minor cur_patch
+	if ! read -r c_major c_minor c_patch < <(version_parts "${candidate}"); then return 1; fi
+	if ! read -r cur_major cur_minor cur_patch < <(version_parts "${current}"); then return 0; fi
+	if ((c_major != cur_major)); then ((c_major > cur_major)); return; fi
+	if ((c_minor != cur_minor)); then ((c_minor > cur_minor)); return; fi
+	((c_patch > cur_patch))
+}
+
+select_highest_version_tag() {
+	local best="" tag
+	while IFS= read -r tag; do
+		[[ -z ${tag} ]] && continue
+		if [[ -z ${best} ]] || tag_is_newer_than "${tag}" "${best}"; then
+			best="${tag}"
+		fi
+	done
+	if [[ -n ${best} ]]; then
+		printf '%s\n' "${best}"
+	fi
+	return 0
+}
+
+require_arg() {
+	local option="$1" value="${2-}"
+	if [[ -z ${value} || ${value} == --* ]]; then
+		err "Missing value for ${option}"
+		exit 1
+	fi
+}
+
 # Note: Configuration backup removed as App/CLI variants use incompatible formats
 # Users will need to re-authenticate after switching to CLI version
 
@@ -391,16 +456,15 @@ install_binaries() {
 		info "Fetching latest release tag..."
 		local tag
 		if [[ ${PRE_RELEASE} == true ]]; then
-			# Fetch multiple releases and find the first one marked as pre-release
 			local response
-			response=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=10")
-			tag=$(echo "${response}" | grep -B30 '"prerelease": *true' | grep '"tag_name"' | tail -1 | sed -E 's/.*"([^\"]+)".*/\1/')
+			response=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=100")
+			tag=$(printf '%s\n' "${response}" | extract_release_tags_by_prerelease "true" | select_highest_version_tag)
 			if [[ -z ${tag} ]]; then
 				warn "No pre-release found, falling back to latest stable"
-				tag=$(echo "${response}" | grep '"tag_name"' | head -1 | sed -E 's/.*"([^\"]+)".*/\1/')
+				tag=$(printf '%s\n' "${response}" | extract_release_tags_by_prerelease "false" | select_highest_version_tag)
 			fi
 		else
-			tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^\"]+)".*/\1/')
+			tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
 		fi
 		[[ -z ${tag} ]] && {
 			err "Failed to resolve latest release"
@@ -450,8 +514,11 @@ install_binaries() {
 	info "Verifying installation..."
 	if command -v tailscale >/dev/null 2>&1 && command -v tailscaled >/dev/null 2>&1; then
 		local ts_version tsd_version
-		ts_version=$(tailscale version --client 2>/dev/null | head -n1 || echo "unknown")
-		tsd_version=$(tailscaled --version 2>/dev/null | head -n1 || echo "unknown")
+		ts_version=$(tailscale version --client 2>/dev/null | head -n1 || true)
+		[[ -z ${ts_version} ]] && ts_version=$(tailscale version 2>/dev/null | head -n1 || true)
+		[[ -z ${ts_version} ]] && ts_version="unknown"
+		tsd_version=$(tailscaled --version 2>/dev/null | head -n1 || true)
+		[[ -z ${tsd_version} ]] && tsd_version="unknown"
 		ok "Installation verified:"
 		echo "  tailscale:  ${ts_version}"
 		echo "  tailscaled: ${tsd_version}"
@@ -581,11 +648,13 @@ main() {
 	while [[ $# -gt 0 ]]; do
 		case $1 in
 		--mirror)
-			MIRROR_PREFIX="$2"
+			require_arg "$1" "${2-}"
+			MIRROR_PREFIX="${2%/}"
 			info "Using mirror: ${MIRROR_PREFIX}"
 			shift 2
 			;;
 		--version)
+			require_arg "$1" "${2-}"
 			VERSION="$2"
 			shift 2
 			;;

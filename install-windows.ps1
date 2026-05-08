@@ -30,6 +30,7 @@ if ([string]::IsNullOrEmpty($MirrorPrefix) -and $env:MIRROR_PREFIX) {
   $MirrorPrefix = $env:MIRROR_PREFIX
   Write-Info "Using mirror from environment: $MirrorPrefix"
 }
+if ($MirrorPrefix) { $MirrorPrefix = $MirrorPrefix.TrimEnd('/') }
 
 #region System Validation
 # Basic compatibility setup
@@ -95,6 +96,35 @@ function Get-OfficialVersionFromTag([string]$Tag) {
   if ($Tag -match '^v?(\d+\.\d+\.\d+)') {
     return $Matches[1]
   }
+  return $null
+}
+
+function Get-VersionObjectFromTag([string]$Tag) {
+  if ($Tag -match '^v?(\d+\.\d+\.\d+)') {
+    return [version]$Matches[1]
+  }
+  return [version]'0.0.0'
+}
+
+function Get-ReleasePublishedAt($Release) {
+  if ($Release -and $Release.published_at) {
+    try { return [datetime]$Release.published_at } catch { }
+  }
+  return [datetime]::MinValue
+}
+
+function Select-HighestVersionRelease($Releases, [bool]$Prerelease) {
+  $filtered = @($Releases | Where-Object { $_.prerelease -eq $Prerelease -and $_.tag_name -match '^v?\d+\.\d+\.\d+' })
+  if (-not $filtered -or $filtered.Count -eq 0) { return $null }
+  return $filtered |
+    Sort-Object -Property @{ Expression = { Get-VersionObjectFromTag -Tag $_.tag_name }; Descending = $true }, @{ Expression = { Get-ReleasePublishedAt -Release $_ }; Descending = $true } |
+    Select-Object -First 1
+}
+
+function Get-ExePathFromCommandLine([string]$CommandLine) {
+  if ([string]::IsNullOrWhiteSpace($CommandLine)) { return $null }
+  if ($CommandLine -match '^\s*"([^"]+)"') { return $Matches[1] }
+  if ($CommandLine -match '^\s*([^\s]+)') { return $Matches[1] }
   return $null
 }
 
@@ -204,7 +234,7 @@ $svc = Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
 if ($svc) {
   $svcCfg = Get-CimInstance Win32_Service -Filter "Name='Tailscale'" -ErrorAction SilentlyContinue
   if ($svcCfg -and $svcCfg.PathName) {
-    $exePath = ($svcCfg.PathName -replace '^"([^"]+)".*', '$1') -replace '^([^\s]+).*', '$1'
+    $exePath = Get-ExePathFromCommandLine -CommandLine $svcCfg.PathName
     if (Test-Path $exePath) {
       $tsdPath = $exePath
       $defaultDir = Split-Path -Path $tsdPath -Parent
@@ -220,11 +250,11 @@ if ($Version -eq 'latest') {
   try {
     Write-Info "Detecting fork version..."
     if ($PreRelease) {
-      $allReleases = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases?per_page=10"
-      $resp = $allReleases | Where-Object { $_.prerelease -eq $true } | Select-Object -First 1
+      $allReleases = @(Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases?per_page=100")
+      $resp = Select-HighestVersionRelease -Releases $allReleases -Prerelease $true
       if (-not $resp) {
         Write-Warn "No pre-release found, falling back to latest stable"
-        $resp = $allReleases | Select-Object -First 1
+        $resp = Select-HighestVersionRelease -Releases $allReleases -Prerelease $false
       }
     } else {
       $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
@@ -320,7 +350,7 @@ $svc = Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
 if ($svc) {
   $svcCfg = Get-CimInstance Win32_Service -Filter "Name='Tailscale'" -ErrorAction SilentlyContinue
   if ($svcCfg -and $svcCfg.PathName) {
-    $exePath = ($svcCfg.PathName -replace '^"([^"]+)".*', '$1')
+    $exePath = Get-ExePathFromCommandLine -CommandLine $svcCfg.PathName
     if (Test-Path $exePath) {
       $tsdPath = $exePath
       $defaultDir = Split-Path -Path $tsdPath -Parent
@@ -348,9 +378,12 @@ if ($Version -eq 'latest') {
     Write-Info 'Resolving latest release...'
     try {
       if ($PreRelease) {
-        $allReleases = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases?per_page=10"
-        $resp = $allReleases | Where-Object { $_.prerelease -eq $true } | Select-Object -First 1
-        if (-not $resp) { $resp = $allReleases | Select-Object -First 1 }
+        $allReleases = @(Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases?per_page=100")
+        $resp = Select-HighestVersionRelease -Releases $allReleases -Prerelease $true
+        if (-not $resp) {
+          Write-Warn "No pre-release found, falling back to latest stable"
+          $resp = Select-HighestVersionRelease -Releases $allReleases -Prerelease $false
+        }
       } else {
         $resp = Invoke-RestCompat -Uri "https://api.github.com/repos/$Repo/releases/latest"
       }
