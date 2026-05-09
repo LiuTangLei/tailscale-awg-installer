@@ -308,9 +308,9 @@ remove_existing_tailscale() {
 	done
 
 	# Remove LaunchDaemon if exists
-	if [[ -f "/Library/LaunchDaemons/com.tailscale.tailscaled.plist" ]]; then
-		${SUDO} launchctl unload "/Library/LaunchDaemons/com.tailscale.tailscaled.plist" 2>/dev/null || true
-		${SUDO} rm -f "/Library/LaunchDaemons/com.tailscale.tailscaled.plist"
+	if [[ -f "${LAUNCHD_PLIST}" ]]; then
+		stop_service || true
+		${SUDO} rm -f "${LAUNCHD_PLIST}"
 		ok "Removed LaunchDaemon"
 	fi
 
@@ -345,10 +345,33 @@ arm64 | aarch64) arch="arm64" ;;
 	;;
 esac
 platform="darwin-${arch}"
+LAUNCHD_LABEL="com.tailscale.tailscaled"
+LAUNCHD_PLIST="/Library/LaunchDaemons/${LAUNCHD_LABEL}.plist"
+MIN_BINARY_SIZE=5242880
 
 # Determine install dir and current tailscaled path
-INSTALL_DIR="/usr/local/bin"
-if [[ -d "/opt/homebrew/bin" ]]; then INSTALL_DIR="/opt/homebrew/bin"; fi
+detect_install_dir() {
+	INSTALL_DIR="/usr/local/bin"
+
+	local brew_prefix=""
+	if command -v brew >/dev/null 2>&1; then
+		brew_prefix=$(brew --prefix 2>/dev/null || true)
+		if [[ -n ${brew_prefix} && -d "${brew_prefix}/bin" ]]; then
+			INSTALL_DIR="${brew_prefix}/bin"
+			return 0
+		fi
+	fi
+
+	if [[ ${arch} == "arm64" && -d "/opt/homebrew/bin" ]]; then
+		INSTALL_DIR="/opt/homebrew/bin"
+	elif [[ -d "/usr/local/bin" ]]; then
+		INSTALL_DIR="/usr/local/bin"
+	elif [[ -d "/opt/homebrew/bin" ]]; then
+		INSTALL_DIR="/opt/homebrew/bin"
+	fi
+}
+
+detect_install_dir
 
 resolve_install_targets() {
 	TS_PATH=$(command -v tailscale 2>/dev/null || true)
@@ -356,9 +379,9 @@ resolve_install_targets() {
 	[[ -z ${TS_PATH-} ]] && TS_PATH="${INSTALL_DIR}/tailscale"
 	[[ -z ${TSD_PATH-} ]] && TSD_PATH="${INSTALL_DIR}/tailscaled"
 
-	if [[ -f "/Library/LaunchDaemons/com.tailscale.tailscaled.plist" ]]; then
+	if [[ -f "${LAUNCHD_PLIST}" ]]; then
 		local plist_path
-		plist_path=$(grep -Eo '/[^ "<]*?/tailscaled' /Library/LaunchDaemons/com.tailscale.tailscaled.plist | head -n1 || true)
+		plist_path=$(grep -Eo '/[^ "<]*?/tailscaled' "${LAUNCHD_PLIST}" | head -n1 || true)
 		if [[ -n ${plist_path} && -e ${plist_path} ]]; then TSD_PATH="${plist_path}"; fi
 	fi
 	export TS_PATH TSD_PATH
@@ -366,18 +389,77 @@ resolve_install_targets() {
 	info "tailscaled -> ${TSD_PATH}"
 }
 
-stop_service() {
-	if launchctl list | grep -q com.tailscale.tailscaled 2>/dev/null; then
-		info "Stopping tailscaled (launchctl unload)..."
-		${SUDO} launchctl unload /Library/LaunchDaemons/com.tailscale.tailscaled.plist 2>/dev/null || true
+service_is_loaded() {
+	# Prefer system-domain checks for LaunchDaemons and fall back to local list.
+	if ${SUDO} launchctl print "system/${LAUNCHD_LABEL}" >/dev/null 2>&1; then
+		return 0
 	fi
+	if ${SUDO} launchctl list 2>/dev/null | grep -q "${LAUNCHD_LABEL}"; then
+		return 0
+	fi
+	return 1
 }
 
-start_service() {
-	# Create LaunchDaemon plist if it doesn't exist
-	if [[ ! -f "/Library/LaunchDaemons/com.tailscale.tailscaled.plist" ]]; then
-		info "Creating LaunchDaemon configuration..."
-		cat <<PLIST | ${SUDO} tee /Library/LaunchDaemons/com.tailscale.tailscaled.plist >/dev/null
+running_tailscaled_pids() {
+	pgrep -x tailscaled 2>/dev/null || true
+}
+
+wait_for_no_tailscaled() {
+	local attempts=0 max_attempts="${1:-10}"
+	while [[ ${attempts} -lt ${max_attempts} ]]; do
+		if [[ -z $(running_tailscaled_pids) ]]; then
+			return 0
+		fi
+		sleep 1
+		attempts=$((attempts + 1))
+	done
+	return 1
+}
+
+wait_for_tailscaled_started() {
+	local attempts=0 max_attempts="${1:-10}"
+	while [[ ${attempts} -lt ${max_attempts} ]]; do
+		if [[ -n $(running_tailscaled_pids) ]]; then
+			return 0
+		fi
+		sleep 1
+		attempts=$((attempts + 1))
+	done
+	return 1
+}
+
+stop_service() {
+	if [[ -f "${LAUNCHD_PLIST}" ]] || service_is_loaded; then
+		info "Stopping tailscaled (launchctl bootout/unload)..."
+		${SUDO} launchctl bootout "system/${LAUNCHD_LABEL}" 2>/dev/null || true
+		${SUDO} launchctl bootout system "${LAUNCHD_PLIST}" 2>/dev/null || true
+		${SUDO} launchctl unload "${LAUNCHD_PLIST}" 2>/dev/null || true
+	fi
+
+	if wait_for_no_tailscaled 5; then
+		return 0
+	fi
+
+	warn "tailscaled is still running after launchctl stop; sending SIGTERM..."
+	${SUDO} pkill -TERM -x tailscaled 2>/dev/null || true
+	if wait_for_no_tailscaled 5; then
+		return 0
+	fi
+
+	warn "tailscaled did not exit cleanly; force killing stale daemon..."
+	${SUDO} pkill -KILL -x tailscaled 2>/dev/null || true
+	if wait_for_no_tailscaled 5; then
+		ok "Stopped old tailscaled process"
+		return 0
+	fi
+
+	err "Unable to stop the running tailscaled process. Please reboot macOS and rerun the installer."
+	return 1
+}
+
+write_launchdaemon_plist() {
+	info "Writing LaunchDaemon configuration..."
+	cat <<PLIST | ${SUDO} tee "${LAUNCHD_PLIST}" >/dev/null
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -403,31 +485,74 @@ start_service() {
 </dict>
 </plist>
 PLIST
-		ok "Created LaunchDaemon configuration"
+	${SUDO} chown root:wheel "${LAUNCHD_PLIST}" 2>/dev/null || true
+	${SUDO} chmod 0644 "${LAUNCHD_PLIST}"
+	ok "Wrote LaunchDaemon configuration"
+}
+
+load_service() {
+	info "Starting tailscaled (launchctl bootstrap/load)..."
+	if ! ${SUDO} launchctl bootstrap system "${LAUNCHD_PLIST}" 2>/dev/null; then
+		${SUDO} launchctl load -w "${LAUNCHD_PLIST}" 2>/dev/null || return 1
 	fi
+	${SUDO} launchctl kickstart -k "system/${LAUNCHD_LABEL}" 2>/dev/null || true
+}
+
+live_version_mismatch_detected() {
+	local tailscale_bin="${TS_PATH-}" status_output=""
+	if [[ ! -x "${tailscale_bin}" ]]; then
+		tailscale_bin=$(command -v tailscale 2>/dev/null || true)
+	fi
+	[[ -z ${tailscale_bin} ]] && return 1
+
+	status_output=$("${tailscale_bin}" status 2>&1 || true)
+	if printf '%s\n' "${status_output}" | grep -q 'client version .* != tailscaled server version'; then
+		printf '%s\n' "${status_output}" | grep 'client version .* != tailscaled server version' | head -n1
+		return 0
+	fi
+	return 1
+}
+
+start_service() {
+	local live_mismatch=""
+
+	stop_service || return 1
 
 	# Ensure directories exist
 	${SUDO} mkdir -p /var/lib/tailscale /var/run
+	write_launchdaemon_plist
 
-	# Ensure service is stopped before starting (force restart)
-	if launchctl list | grep -q com.tailscale.tailscaled 2>/dev/null; then
-		info "Ensuring tailscaled is stopped before restart..."
-		${SUDO} launchctl unload /Library/LaunchDaemons/com.tailscale.tailscaled.plist 2>/dev/null || true
-		sleep 1
+	if ! load_service; then
+		warn "tailscaled service may not have started properly"
+		echo "You can manually start it with: sudo launchctl bootstrap system ${LAUNCHD_PLIST}"
+		return 1
 	fi
 
-	info "Starting tailscaled (launchctl load)..."
-	${SUDO} launchctl load /Library/LaunchDaemons/com.tailscale.tailscaled.plist 2>/dev/null || true
-
-	# Wait a moment for service to start
-	sleep 2
-
 	# Verify service is running
-	if pgrep -f tailscaled >/dev/null 2>&1; then
+	if wait_for_tailscaled_started 10; then
 		ok "tailscaled service started successfully"
 	else
 		warn "tailscaled service may not have started properly"
-		echo "You can manually start it with: sudo launchctl load /Library/LaunchDaemons/com.tailscale.tailscaled.plist"
+		echo "You can manually start it with: sudo launchctl bootstrap system ${LAUNCHD_PLIST}"
+		echo "Or reboot your Mac and retry if the daemon is still using the old binary."
+		return 1
+	fi
+
+	if live_mismatch=$(live_version_mismatch_detected); then
+		warn "Live client/daemon version mismatch detected: ${live_mismatch}"
+		info "Retrying tailscaled restart once..."
+		stop_service || return 1
+		load_service || return 1
+		if ! wait_for_tailscaled_started 10; then
+			err "tailscaled did not start after retry. Please reboot macOS and rerun the installer."
+			return 1
+		fi
+		if live_mismatch=$(live_version_mismatch_detected); then
+			err "Live daemon still reports an old version: ${live_mismatch}"
+			echo "Please reboot macOS to clear the old daemon process, then run 'tailscale status' again."
+			return 1
+		fi
+		ok "Live client and daemon versions no longer report a mismatch"
 	fi
 }
 
@@ -449,6 +574,57 @@ install_official_if_missing() {
 	else
 		info "Tailscale found; will replace binaries with Amnezia-WG versions"
 	fi
+}
+
+download_file() {
+	local url="$1" output="$2"
+	curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 "${url}" -o "${output}"
+}
+
+verify_downloaded_binary() {
+	local binary_path="$1" binary_name="$2" file_size file_type
+	if [[ ! -f "${binary_path}" ]]; then
+		err "Downloaded ${binary_name} binary not found"
+		return 1
+	fi
+
+	file_size=$(wc -c <"${binary_path}" | tr -d '[:space:]')
+	if [[ -z ${file_size} || ${file_size} -lt ${MIN_BINARY_SIZE} ]]; then
+		err "Downloaded ${binary_name} binary is too small (${file_size:-0} bytes)"
+		return 1
+	fi
+
+	if command -v file >/dev/null 2>&1; then
+		file_type=$(file "${binary_path}" 2>/dev/null || true)
+		case ${arch} in
+		amd64)
+			if [[ ! ${file_type} =~ x86_64 ]]; then
+				err "Downloaded ${binary_name} binary is not Intel/x86_64: ${file_type}"
+				return 1
+			fi
+			;;
+		arm64)
+			if [[ ! ${file_type} =~ arm64 ]]; then
+				err "Downloaded ${binary_name} binary is not Apple Silicon/arm64: ${file_type}"
+				return 1
+			fi
+			;;
+		esac
+	fi
+}
+
+binary_version() {
+	local binary_path="$1" binary_name="$2" version=""
+	case ${binary_name} in
+	tailscale)
+		version=$("${binary_path}" version --client 2>/dev/null | head -n1 || true)
+		[[ -z ${version} ]] && version=$("${binary_path}" version 2>/dev/null | head -n1 || true)
+		;;
+	tailscaled)
+		version=$("${binary_path}" --version 2>/dev/null | head -n1 || true)
+		;;
+	esac
+	printf '%s\n' "${version:-unknown}"
 }
 
 install_binaries() {
@@ -491,10 +667,12 @@ install_binaries() {
 	trap 'rm -rf "$tmp"' EXIT
 	pushd "${tmp}" >/dev/null
 	info "Downloading ${ts}"
-	curl -fL "${base_url}/${ts}" -o tailscale
+	download_file "${base_url}/${ts}" tailscale
 	info "Downloading ${tsd}"
-	curl -fL "${base_url}/${tsd}" -o tailscaled
+	download_file "${base_url}/${tsd}" tailscaled
 	chmod +x tailscale tailscaled
+	verify_downloaded_binary tailscale tailscale
+	verify_downloaded_binary tailscaled tailscaled
 
 	stop_service
 	resolve_install_targets
@@ -512,13 +690,10 @@ install_binaries() {
 
 	# Verify installation
 	info "Verifying installation..."
-	if command -v tailscale >/dev/null 2>&1 && command -v tailscaled >/dev/null 2>&1; then
+	if [[ -x "${TS_PATH}" && -x "${TSD_PATH}" ]]; then
 		local ts_version tsd_version
-		ts_version=$(tailscale version --client 2>/dev/null | head -n1 || true)
-		[[ -z ${ts_version} ]] && ts_version=$(tailscale version 2>/dev/null | head -n1 || true)
-		[[ -z ${ts_version} ]] && ts_version="unknown"
-		tsd_version=$(tailscaled --version 2>/dev/null | head -n1 || true)
-		[[ -z ${tsd_version} ]] && tsd_version="unknown"
+		ts_version=$(binary_version "${TS_PATH}" tailscale)
+		tsd_version=$(binary_version "${TSD_PATH}" tailscaled)
 		ok "Installation verified:"
 		echo "  tailscale:  ${ts_version}"
 		echo "  tailscaled: ${tsd_version}"
@@ -534,7 +709,7 @@ install_binaries() {
 			fi
 		fi
 	else
-		warn "Installation verification failed - binaries may not be in PATH"
+		warn "Installation verification failed - installed binaries are not executable"
 	fi
 }
 
@@ -543,7 +718,7 @@ uninstall_all() {
 	warn "Uninstalling Tailscale (all variants and configurations)..."
 
 	# Stop services first
-	stop_service
+	stop_service || true
 
 	# tailscale logout (ignore errors)
 	if command -v tailscale &>/dev/null; then
@@ -579,9 +754,9 @@ uninstall_all() {
 	done
 
 	# Remove LaunchDaemon plist
-	if [[ -f "/Library/LaunchDaemons/com.tailscale.tailscaled.plist" ]]; then
+	if [[ -f "${LAUNCHD_PLIST}" ]]; then
 		info "Removing LaunchDaemon..."
-		${SUDO} rm -f "/Library/LaunchDaemons/com.tailscale.tailscaled.plist" && ok "Removed LaunchDaemon plist" || true
+		${SUDO} rm -f "${LAUNCHD_PLIST}" && ok "Removed LaunchDaemon plist" || true
 	fi
 
 	# Remove state and configuration directories
