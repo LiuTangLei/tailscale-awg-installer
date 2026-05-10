@@ -1,3 +1,35 @@
+
+<div align="right">
+  <details>
+    <summary >🌐 Language</summary>
+    <div>
+      <div align="center">
+        <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=en">English</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=zh-CN">简体中文</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=zh-TW">繁體中文</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=ja">日本語</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=ko">한국어</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=hi">हिन्दी</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=th">ไทย</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=fr">Français</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=de">Deutsch</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=es">Español</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=it">Italiano</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=ru">Русский</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=pt">Português</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=nl">Nederlands</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=pl">Polski</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=ar">العربية</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=fa">فارسی</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=tr">Türkçe</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=vi">Tiếng Việt</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=id">Bahasa Indonesia</a>
+        | <a href="https://openaitx.github.io/view.html?user=LiuTangLei&project=tailscale-awg-installer&lang=as">অসমীয়া</
+      </div>
+    </div>
+  </details>
+</div>
+
 # Tailscale with Amnezia-WG 2.0 (v1.88.2+)
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
