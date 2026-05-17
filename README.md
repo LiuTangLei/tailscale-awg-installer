@@ -1,10 +1,10 @@
 # Tailscale with Amnezia-WG 2.0 (v1.88.2+)
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
-[![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android-blue)](https://github.com/LiuTangLei/tailscale/releases/latest)
+[![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android%20|%20iOS-blue)](#platform-support)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](LICENSE)
 
-Enhanced Tailscale client with Amnezia-WG 2.0 obfuscation: junk traffic, protocol signatures, and handshake/header masquerading to resist DPI and blocking. Until you enable AWG settings, it behaves like standard Tailscale.
+Enhanced Tailscale client with Amnezia-WG 2.0 obfuscation: junk traffic, protocol signatures, and handshake/header masquerading to resist DPI and blocking. It works with the official Tailscale control server and Headscale; no custom control server is required. Until you enable AWG settings, it behaves like standard Tailscale. Junk traffic and CPS signature modes interoperate with standard Tailscale peers, while handshake/header masquerading requires matching AWG settings on AWG peers.
 
 Languages: [English](README.md) | [中文](doc/README-zh.md) | [فارسی](doc/README-fa.md) | [Русский](doc/README-ru.md)
 
@@ -19,9 +19,11 @@ For AWG v1.5 documentation, see [doc/README-awg-v1.5.md](doc/README-awg-v1.5.md)
 | Windows (Admin PowerShell) | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
 | OpenWrt | See [OpenWrt Installation](#openwrt-installation) |
 | Android | Download APK from [releases](https://github.com/LiuTangLei/tailscale-android/releases) |
+| iOS | Experimental open-source client: see [AwgScale](https://github.com/LiuTangLei/AwgScale) (TrollStore or Packet Tunnel entitlement signing required) |
 
 - macOS: the installer uses CLI-only `tailscaled`. If the official Tailscale.app is detected, you'll be prompted to remove it to avoid conflicts.
-- Android currently supports AWG config sync only. Use the in-app Sync button.
+- Android and iOS mobile clients support manual AWG setup and syncing AWG settings from other nodes.
+- iOS: AwgScale is experimental and self-managed. It is not available on the App Store; the current IPA targets TrollStore, or a normal Apple signing path with the Packet Tunnel entitlement.
 
 ![Android AWG Sync Example](doc/sync1.jpg)
 
@@ -114,8 +116,8 @@ Press Enter at the auto-generation prompt to generate recommended values for eve
 
 3. On other devices, sync the same AWG config from this already-configured node:
 
-- Desktop: run `tailscale awg sync` on the other device
-- Android: tap Sync in the app on the other device
+- CLI platforms (Linux/macOS/Windows/OpenWrt): run `tailscale awg sync` on the other device
+- Android and iOS (AwgScale): use the in-app AWG controls to set values manually or sync settings from another node
 
 4. Verify or reset when needed:
 
@@ -151,7 +153,8 @@ Very large junk counts or long signature chains increase latency and bandwidth u
 | macOS | Intel, Apple Silicon | ✅ Full |
 | Windows | x86_64, ARM64 | ✅ Installer |
 | OpenWrt | Various | ✅ Script |
-| Android | ARM64, ARM | ✅ APK (sync-only AWG) |
+| Android | ARM64, ARM | ✅ APK (manual AWG + sync) |
+| iOS | iPhone/iPad (iOS 15+) | ✅ Experimental client (manual AWG + sync) |
 
 ## Advanced: CPS Protocol Signatures
 
@@ -205,6 +208,7 @@ tailscale awg set
 
 - Releases: <https://github.com/LiuTangLei/tailscale/releases>
 - Android APK: <https://github.com/LiuTangLei/tailscale-android/releases>
+- iOS client (AwgScale): <https://github.com/LiuTangLei/AwgScale>
 - Installer issues: <https://github.com/LiuTangLei/tailscale-awg-installer/issues>
 - Amnezia-WG docs: <https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted/#how-to-extract-a-protocol-signature-for-amneziawg-manually>
 

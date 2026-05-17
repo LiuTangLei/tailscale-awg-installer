@@ -2,10 +2,10 @@
 # Tailscale با Amnezia‑WG 2.0 (v1.88.2+)
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
-[![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android-blue)](https://github.com/LiuTangLei/tailscale/releases/latest)
+[![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android%20|%20iOS-blue)](#پشتیبانی-پلتفرم)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](../LICENSE)
 
-این پروژه نسخه تقویت‌شده Tailscale با پشتیبانی Amnezia‑WG 2.0 است. با فعال کردن پارامترهای AWG می‌توانید از ترافیک زائد، امضاهای پروتکل، و پنهان‌سازی دست‌دهی و هدر استفاده کنید. تا قبل از فعال‌سازی AWG، رفتار آن مانند Tailscale استاندارد است.
+این پروژه نسخه تقویت‌شده Tailscale با پشتیبانی Amnezia‑WG 2.0 است. با فعال کردن پارامترهای AWG می‌توانید از ترافیک زائد، امضاهای پروتکل، و پنهان‌سازی دست‌دهی و هدر استفاده کنید. با سرور رسمی Tailscale و Headscale سازگار است و به کنترل‌سرور سفارشی نیاز ندارد. تا قبل از فعال‌سازی AWG، رفتار آن مانند Tailscale استاندارد است. حالت‌های ترافیک زائد و امضای CPS با گره‌های استاندارد Tailscale کار می‌کنند، اما پنهان‌سازی دست‌دهی/هدر به تنظیمات AWG یکسان روی گره‌های AWG نیاز دارد.
 
 زبان‌ها: [English](../README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
 
@@ -20,9 +20,11 @@
 | ویندوز (PowerShell ادمین) | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
 | OpenWrt | [نصب OpenWrt](#نصب-openwrt) را ببینید |
 | اندروید | APK را از [releases](https://github.com/LiuTangLei/tailscale-android/releases) دانلود کنید |
+| iOS | کلاینت متن‌باز آزمایشی: [AwgScale](https://github.com/LiuTangLei/AwgScale) (نیازمند TrollStore یا امضای دارای Packet Tunnel entitlement) |
 
 - macOS: نصب‌کننده از `tailscaled` در حالت CLI استفاده می‌کند. اگر Tailscale.app رسمی پیدا شود، برای جلوگیری از تداخل پیشنهاد حذف آن نمایش داده می‌شود.
-- اندروید: فعلاً فقط همگام‌سازی دریافت AWG پشتیبانی می‌شود.
+- کلاینت‌های موبایل Android و iOS از تنظیم دستی AWG و همگام‌سازی تنظیمات AWG از گره‌های دیگر پشتیبانی می‌کنند.
+- iOS: AwgScale آزمایشی و self-managed است، در App Store منتشر نشده و IPA فعلی برای TrollStore یا مسیر امضای Apple با Packet Tunnel entitlement است.
 
 ![Android Sync](sync1.jpg)
 
@@ -115,8 +117,8 @@ tailscale awg set
 
 3. سایر دستگاه‌ها را همگام‌سازی کنید:
 
-- دسکتاپ: `tailscale awg sync`
-- اندروید: دکمه Sync در برنامه
+- پلتفرم‌های CLI (Linux/macOS/Windows/OpenWrt): `tailscale awg sync`
+- Android و iOS (AwgScale): در برنامه AWG را دستی تنظیم کنید یا تنظیمات را از گره دیگر sync کنید
 
 4. در صورت نیاز بررسی یا ریست کنید:
 
@@ -152,7 +154,8 @@ tailscale awg reset
 | macOS | Intel, Apple Silicon | ✅ کامل |
 | ویندوز | x86_64, ARM64 | ✅ نصب‌کننده |
 | OpenWrt | متنوع | ✅ اسکریپت |
-| اندروید | ARM64, ARM | ✅ APK (فقط sync AWG) |
+| اندروید | ARM64, ARM | ✅ APK (تنظیم دستی AWG + sync) |
+| iOS | iPhone/iPad (iOS 15+) | ✅ کلاینت آزمایشی (تنظیم دستی AWG + sync) |
 
 ## پیشرفته: امضاهای پروتکل
 
@@ -204,6 +207,7 @@ tailscale awg set
 
 - Releases: <https://github.com/LiuTangLei/tailscale/releases>
 - Android APK: <https://github.com/LiuTangLei/tailscale-android/releases>
+- کلاینت iOS (AwgScale): <https://github.com/LiuTangLei/AwgScale>
 - Issues نصب‌کننده: <https://github.com/LiuTangLei/tailscale-awg-installer/issues>
 - مستندات Amnezia‑WG: <https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted/#how-to-extract-a-protocol-signature-for-amneziawg-manually>
 

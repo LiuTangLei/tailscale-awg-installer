@@ -1,10 +1,10 @@
 # Tailscale с Amnezia‑WG 2.0 (v1.88.2+)
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
-[![Поддерживаемые платформы](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android-blue)](https://github.com/LiuTangLei/tailscale/releases/latest)
+[![Поддерживаемые платформы](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android%20|%20iOS-blue)](#поддержка-платформ)
 [![Лицензия](https://img.shields.io/badge/license-BSD--3--Clause-green)](../LICENSE)
 
-Этот проект добавляет в Tailscale обфускацию Amnezia‑WG 2.0: мусорный трафик, сигнатуры протоколов, маскировку рукопожатия и заголовков. Пока вы не включили AWG-параметры, поведение соответствует обычному Tailscale.
+Этот проект добавляет в Tailscale обфускацию Amnezia‑WG 2.0: мусорный трафик, сигнатуры протоколов, маскировку рукопожатия и заголовков. Он совместим с официальным control server Tailscale и Headscale; отдельный кастомный control server не требуется. Пока вы не включили AWG-параметры, поведение соответствует обычному Tailscale. Режимы мусорного трафика и CPS-сигнатур совместимы со стандартными узлами Tailscale, а маскировка рукопожатия/заголовков требует одинаковых AWG-настроек на AWG-узлах.
 
 Языки: [English](../README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
 
@@ -19,9 +19,11 @@
 | Windows | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
 | OpenWrt | См. [Установка OpenWrt](#установка-openwrt) |
 | Android | Загрузите APK из [releases](https://github.com/LiuTangLei/tailscale-android/releases) |
+| iOS | Экспериментальный open-source клиент: [AwgScale](https://github.com/LiuTangLei/AwgScale) (нужен TrollStore или подпись с Packet Tunnel entitlement) |
 
 - macOS: установщик использует CLI-версию `tailscaled`. Если обнаружен официальный Tailscale.app, будет предложено удалить его во избежание конфликтов.
-- Android: пока поддерживается только получение AWG-конфигурации через Sync.
+- Мобильные клиенты Android и iOS поддерживают ручную настройку AWG и синхронизацию AWG-настроек с других узлов.
+- iOS: AwgScale является экспериментальным self-managed клиентом, не доступен в App Store; текущий IPA рассчитан на TrollStore или обычную подпись Apple с Packet Tunnel entitlement.
 
 ![Пример синхронизации AWG на Android](sync1.jpg)
 
@@ -114,8 +116,8 @@ tailscale awg set
 
 3. Синхронизируйте другие устройства:
 
-- Desktop: `tailscale awg sync`
-- Android: кнопка Sync в приложении
+- CLI-платформы (Linux/macOS/Windows/OpenWrt): `tailscale awg sync`
+- Android и iOS (AwgScale): настройте AWG вручную в приложении или синхронизируйте настройки с другого узла
 
 4. Проверяйте или сбрасывайте настройки при необходимости:
 
@@ -151,7 +153,8 @@ tailscale awg reset
 | macOS | Intel, Apple Silicon | ✅ Полная |
 | Windows | x86_64, ARM64 | ✅ Установщик |
 | OpenWrt | Различные | ✅ Скрипт |
-| Android | ARM64, ARM | ✅ APK (только sync AWG) |
+| Android | ARM64, ARM | ✅ APK (ручная настройка AWG + sync) |
+| iOS | iPhone/iPad (iOS 15+) | ✅ Экспериментальный клиент (ручная настройка AWG + sync) |
 
 ## Дополнительно: сигнатуры протоколов
 
@@ -203,6 +206,7 @@ tailscale awg set
 
 - Releases: <https://github.com/LiuTangLei/tailscale/releases>
 - Android APK: <https://github.com/LiuTangLei/tailscale-android/releases>
+- iOS клиент (AwgScale): <https://github.com/LiuTangLei/AwgScale>
 - Установщик (issues): <https://github.com/LiuTangLei/tailscale-awg-installer/issues>
 - Amnezia-WG docs: <https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted/#how-to-extract-a-protocol-signature-for-amneziawg-manually>
 

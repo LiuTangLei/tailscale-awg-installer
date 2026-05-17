@@ -1,10 +1,10 @@
 # Tailscale with Amnezia‑WG 2.0（v1.88.2+）
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
-[![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android-blue)](https://github.com/LiuTangLei/tailscale/releases/latest)
+[![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android%20|%20iOS-blue)](#平台支持)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](../LICENSE)
 
-本项目基于 Tailscale，集成 Amnezia-WG 2.0 混淆能力，可通过垃圾流量、协议签名、握手和头部伪装降低 WireGuard 流量被 DPI 识别的概率。不启用 AWG 参数时，行为与标准 Tailscale 一致。
+本项目基于 Tailscale，集成 Amnezia-WG 2.0 混淆能力，可通过垃圾流量、协议签名、握手和头部伪装降低 WireGuard 流量被 DPI 识别的概率。它兼容官方 Tailscale 控制服务器和 Headscale，不需要自建或修改控制服务器。不启用 AWG 参数时，行为与标准 Tailscale 一致。垃圾流量和 CPS 签名模式可与标准 Tailscale 节点互通；握手/头部伪装需要参与的 AWG 节点使用一致配置。
 
 语言： [English](../README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
 
@@ -19,9 +19,11 @@ AWG 1.5 旧文档： [README-awg-v1.5.md](README-awg-v1.5.md)
 | Windows | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
 | OpenWrt | 见下方 [OpenWrt 安装](#openwrt-安装) |
 | Android | 从 [releases](https://github.com/LiuTangLei/tailscale-android/releases) 下载 APK |
+| iOS | 实验性开源客户端：见 [AwgScale](https://github.com/LiuTangLei/AwgScale)（需要 TrollStore 或具备 Packet Tunnel 权限的签名） |
 
 - macOS：安装器使用 CLI 版 `tailscaled`。若检测到官方 Tailscale.app，会提示移除以避免冲突。
-- Android：目前仅支持接收 AWG 配置同步，请使用应用内 Sync 按钮。
+- Android 和 iOS 移动端都支持手动设置 AWG，并可从其他节点同步 AWG 设置。
+- iOS：AwgScale 是实验性自管理客户端，未上架 App Store；当前 IPA 主要面向 TrollStore，或使用 Apple 授予 Packet Tunnel entitlement 的正常签名路径。
 
 ![Android 同步示例](sync1.jpg)
 
@@ -114,8 +116,8 @@ tailscale awg set
 
 3. 在其他设备上，从当前这台已配置节点同步相同的 AWG 配置：
 
-- 桌面端：在其他设备上运行 `tailscale awg sync`
-- Android：在其他设备上的应用内点击 Sync
+- CLI 平台（Linux/macOS/Windows/OpenWrt）：在其他设备上运行 `tailscale awg sync`
+- Android 和 iOS（AwgScale）：在应用内手动设置 AWG，或从其他节点同步设置
 
 4. 查看或重置：
 
@@ -151,7 +153,8 @@ tailscale awg reset
 | macOS | Intel, Apple Silicon | ✅ 完整 |
 | Windows | x86_64, ARM64 | ✅ 安装器 |
 | OpenWrt | 多种架构 | ✅ 脚本 |
-| Android | ARM64, ARM | ✅ APK（仅同步 AWG） |
+| Android | ARM64, ARM | ✅ APK（手动设置 AWG + 同步） |
+| iOS | iPhone/iPad (iOS 15+) | ✅ 实验性客户端（手动设置 AWG + 同步） |
 
 ## 高级：CPS 自定义协议签名
 
@@ -205,6 +208,7 @@ tailscale awg set
 
 - Releases: <https://github.com/LiuTangLei/tailscale/releases>
 - Android APK: <https://github.com/LiuTangLei/tailscale-android/releases>
+- iOS 客户端（AwgScale）: <https://github.com/LiuTangLei/AwgScale>
 - 安装器问题: <https://github.com/LiuTangLei/tailscale-awg-installer/issues>
 - Amnezia-WG 文档: <https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted/#how-to-extract-a-protocol-signature-for-amneziawg-manually>
 
