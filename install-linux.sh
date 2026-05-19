@@ -402,8 +402,10 @@ reinstall_specific_version() {
 			;;
 		esac
 		if [[ ${installed} == true ]]; then
-			[[ ${try_ver} != "${version}" ]] && log G "Installed Tailscale ${try_ver} (closest match to ${version})"
-			return
+			if [[ ${try_ver} != "${version}" ]]; then
+				log G "Installed Tailscale ${try_ver} (closest match to ${version})"
+			fi
+			return 0
 		fi
 	done
 	log Y "Failed to install Tailscale ${version} (or any lower patch version), continuing with installed version"
