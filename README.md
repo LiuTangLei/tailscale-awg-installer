@@ -1,4 +1,4 @@
-# Tailscale with Amnezia-WG 2.0 (v1.88.2+)
+# Tailscale with Amnezia-WG 2.0
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
 [![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android%20|%20iOS-blue)](#platform-support)
@@ -8,7 +8,7 @@ Enhanced Tailscale client with Amnezia-WG 2.0 obfuscation: junk traffic, protoco
 
 Languages: [English](README.md) | [中文](doc/README-zh.md) | [فارسی](doc/README-fa.md) | [Русский](doc/README-ru.md)
 
-For AWG v1.5 documentation, see [doc/README-awg-v1.5.md](doc/README-awg-v1.5.md).
+Legacy AWG 1.5 archive: [doc/README-awg-v1.5.md](doc/README-awg-v1.5.md).
 
 ## Installation
 
@@ -49,13 +49,32 @@ Basic flow:
 
 If you use Headscale, add `--login-server https://your-headscale-domain` to `tailscale up`.
 
-Optional host alias:
+Note the two names: the Compose service/container is `tailscaled`, and the CLI binary inside the container is `tailscale`. So the direct Docker form is:
 
 ```bash
-alias tailscale='docker exec -it tailscaled tailscale'
+docker exec -it tailscaled tailscale status
 ```
 
-That alias only applies to the current shell. To keep it after reboot or a new terminal session, add it to `~/.bashrc` or `~/.zshrc` and reload your shell.
+`docker exec tailscale status` is not equivalent: Docker would look for a container named `tailscale`, then try to run `status` as a program.
+
+To use `tailscale ...` directly on the Linux host, persist an alias in your shell startup file:
+
+```bash
+printf "\nalias tailscale='docker exec -it tailscaled tailscale'\n" >> ~/.bashrc && . ~/.bashrc
+```
+
+For Zsh, use `~/.zshrc` instead:
+
+```bash
+printf "\nalias tailscale='docker exec -it tailscaled tailscale'\n" >> ~/.zshrc && . ~/.zshrc
+```
+
+Then run:
+
+```bash
+tailscale up
+tailscale awg get
+```
 
 ## OpenWrt Installation
 

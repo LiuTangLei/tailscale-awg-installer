@@ -1,5 +1,5 @@
 
-# Tailscale با Amnezia‑WG 2.0 (v1.88.2+)
+# Tailscale با Amnezia‑WG 2.0
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
 [![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android%20|%20iOS-blue)](#پشتیبانی-پلتفرم)
@@ -9,7 +9,7 @@
 
 زبان‌ها: [English](../README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
 
-مستندات AWG 1.5: [README-awg-v1.5.md](README-awg-v1.5.md)
+آرشیو نسخه قدیمی AWG 1.5: [README-awg-v1.5.md](README-awg-v1.5.md).
 
 ## نصب
 
@@ -50,13 +50,32 @@ docker compose up -d
 
 اگر از Headscale استفاده می‌کنید، در `tailscale up` گزینه `--login-server https://your-headscale-domain` را اضافه کنید.
 
-Alias اختیاری روی میزبان:
+اینجا دو نام ممکن است با هم اشتباه شوند: سرویس/کانتینر Compose با نام `tailscaled` اجرا می‌شود، اما برنامه CLI داخل کانتینر `tailscale` است. بنابراین شکل مستقیم Docker این است:
 
 ```bash
-alias tailscale='docker exec -it tailscaled tailscale'
+docker exec -it tailscaled tailscale status
 ```
 
-این alias فقط برای shell فعلی معتبر است. برای ماندگاری، آن را به `~/.bashrc` یا `~/.zshrc` اضافه کنید و shell را دوباره بارگذاری کنید.
+`docker exec tailscale status` معادل آن نیست: Docker ابتدا به دنبال کانتینری با نام `tailscale` می‌گردد و سپس تلاش می‌کند `status` را به عنوان یک برنامه داخل آن اجرا کند.
+
+برای اینکه روی میزبان Linux مستقیماً از `tailscale ...` استفاده کنید، alias را در فایل راه‌اندازی shell ذخیره کنید:
+
+```bash
+printf "\nalias tailscale='docker exec -it tailscaled tailscale'\n" >> ~/.bashrc && . ~/.bashrc
+```
+
+برای Zsh از `~/.zshrc` استفاده کنید:
+
+```bash
+printf "\nalias tailscale='docker exec -it tailscaled tailscale'\n" >> ~/.zshrc && . ~/.zshrc
+```
+
+بعد از آن می‌توانید اجرا کنید:
+
+```bash
+tailscale up
+tailscale awg get
+```
 
 ## نصب OpenWrt
 

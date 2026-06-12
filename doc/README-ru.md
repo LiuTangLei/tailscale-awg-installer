@@ -1,4 +1,4 @@
-# Tailscale с Amnezia‑WG 2.0 (v1.88.2+)
+# Tailscale с Amnezia‑WG 2.0
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
 [![Поддерживаемые платформы](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android%20|%20iOS-blue)](#поддержка-платформ)
@@ -8,7 +8,7 @@
 
 Языки: [English](../README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
 
-Документация AWG 1.5: [README-awg-v1.5.md](README-awg-v1.5.md)
+Архив старой версии AWG 1.5: [README-awg-v1.5.md](README-awg-v1.5.md).
 
 ## Установка
 
@@ -49,13 +49,32 @@ docker compose up -d
 
 Если вы используете Headscale, добавьте к `tailscale up` параметр `--login-server https://your-headscale-domain`.
 
-Необязательный alias на хосте:
+Здесь легко перепутать два имени: сервис/контейнер Compose называется `tailscaled`, а CLI-команда внутри контейнера — `tailscale`. Поэтому прямой Docker-вариант выглядит так:
 
 ```bash
-alias tailscale='docker exec -it tailscaled tailscale'
+docker exec -it tailscaled tailscale status
 ```
 
-Этот alias действует только в текущем shell. Чтобы сохранить его после перезагрузки или открытия нового терминала, добавьте его в `~/.bashrc` или `~/.zshrc`, затем перезагрузите shell.
+`docker exec tailscale status` не то же самое: Docker будет искать контейнер с именем `tailscale`, а затем попытается запустить `status` как программу внутри него.
+
+Чтобы запускать `tailscale ...` прямо на Linux-хосте, сохраните alias в файле запуска shell:
+
+```bash
+printf "\nalias tailscale='docker exec -it tailscaled tailscale'\n" >> ~/.bashrc && . ~/.bashrc
+```
+
+Для Zsh используйте `~/.zshrc`:
+
+```bash
+printf "\nalias tailscale='docker exec -it tailscaled tailscale'\n" >> ~/.zshrc && . ~/.zshrc
+```
+
+После этого можно запускать:
+
+```bash
+tailscale up
+tailscale awg get
+```
 
 ## Установка OpenWrt
 
@@ -213,5 +232,4 @@ tailscale awg set
 ## Лицензия
 
 BSD 3-Clause, как и у upstream Tailscale.
-
 

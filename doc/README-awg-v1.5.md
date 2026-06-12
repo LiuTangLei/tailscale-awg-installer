@@ -1,14 +1,6 @@
 # Tailscale with Amnezia-WG 1.5
 
-> Note: This document is frozen for AWG v1.5 only.
->
-> Supported versions:
->
-> - Tailscale: [v1.86.5](https://github.com/LiuTangLei/tailscale/releases/tag/v1.86.5)
-> - Android: [v1.86.5](https://github.com/LiuTangLei/tailscale-android/releases/tag/v1.86.5)
-> - Docker: [`ltlei/tailscale-awg:v1.86.5`](https://hub.docker.com/r/ltlei/tailscale-awg)
->
-> For AWG 2.0+ please refer to the main README.
+> Legacy AWG 1.5 archive; new installations should use the main README.
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
 [![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20Android-blue)](https://github.com/LiuTangLei/tailscale/releases/latest)

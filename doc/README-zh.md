@@ -1,4 +1,4 @@
-# Tailscale with Amnezia‑WG 2.0（v1.88.2+）
+# Tailscale with Amnezia‑WG 2.0
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
 [![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android%20|%20iOS-blue)](#平台支持)
@@ -8,7 +8,7 @@
 
 语言： [English](../README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
 
-AWG 1.5 旧文档： [README-awg-v1.5.md](README-awg-v1.5.md)
+AWG 1.5 旧版留档：[README-awg-v1.5.md](README-awg-v1.5.md)。
 
 ## 安装
 
@@ -49,13 +49,32 @@ docker compose up -d
 
 如果使用 Headscale，在 `tailscale up` 后追加 `--login-server https://你的域名`。
 
-可选：如果希望像宿主机原生安装一样直接执行 `tailscale ...`，可以添加 alias：
+这里有两个名字容易混：Compose 服务/容器名是 `tailscaled`，容器内的 CLI 程序名是 `tailscale`。所以直接用 Docker 时应写成：
 
 ```bash
-alias tailscale='docker exec -it tailscaled tailscale'
+docker exec -it tailscaled tailscale status
 ```
 
-这个 alias 只对当前 shell 生效。若要持久化，请写入 `~/.bashrc` 或 `~/.zshrc`，然后重新加载 shell。
+`docker exec tailscale status` 不等价：Docker 会先找名为 `tailscale` 的容器，再把 `status` 当成容器里的程序执行。
+
+如果希望 Linux 宿主机直接使用 `tailscale ...`，把 alias 持久化到当前 shell 的启动文件：
+
+```bash
+printf "\nalias tailscale='docker exec -it tailscaled tailscale'\n" >> ~/.bashrc && . ~/.bashrc
+```
+
+如果使用 Zsh，改写入 `~/.zshrc`：
+
+```bash
+printf "\nalias tailscale='docker exec -it tailscaled tailscale'\n" >> ~/.zshrc && . ~/.zshrc
+```
+
+之后就可以直接运行：
+
+```bash
+tailscale up
+tailscale awg get
+```
 
 ## OpenWrt 安装
 
