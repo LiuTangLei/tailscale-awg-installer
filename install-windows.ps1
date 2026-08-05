@@ -1,4 +1,4 @@
-# Windows-only installer (PowerShell): replace official Tailscale with Amnezia-WG 2.0-enabled binaries
+# Windows-only installer (PowerShell): replace official Tailscale with AWG v2/v3-enabled binaries
 # Compatible with Windows PowerShell 5.1 and PowerShell 7+
 # Requires: Admin
 #
@@ -17,6 +17,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$AwgCRemovedVersion = [version]'1.98.5'
+$AwgV3MinVersion = [version]'1.102.2'
+$LegacyCpsCounterDetected = $false
 
 #region Output Functions
 function Write-Info($m) { Write-Host "[INFO] $m" -ForegroundColor Cyan }
@@ -177,6 +180,48 @@ function Get-InstalledTailscaleVersion {
   return $null
 }
 
+function Test-LegacyCpsCounterTag {
+  $cmd = Get-Command tailscale.exe -ErrorAction SilentlyContinue
+  if (-not $cmd) { return $false }
+  try {
+    $text = (& $cmd.Source awg get 2>$null | Out-String)
+    if (-not $text) {
+      $text = (& $cmd.Source amnezia-wg get 2>$null | Out-String)
+    }
+    return $text.Contains('<c>')
+  } catch {
+    return $false
+  }
+}
+
+function Show-AwgGuidance([string]$ReleaseTag, [bool]$LegacyCounterDetected) {
+  $releaseVersion = Get-VersionObjectFromTag -Tag $ReleaseTag
+  $supportsV3 = $releaseVersion -ge $AwgV3MinVersion
+  Write-Host 'Amnezia-WG commands (awg = amnezia-wg):'
+  if ($supportsV3) {
+    Write-Ok 'AWG v3 is available; existing AWG v2 profiles remain supported.'
+    Write-Host '  tailscale awg set        # Enter = generate AWG v3; choose 2 for AWG v2'
+  } else {
+    Write-Warn "This release predates AWG v3; install v$AwgV3MinVersion or newer for the v3 generator."
+    Write-Host '  tailscale awg set        # Configure the AWG version supported by this release'
+  }
+  if ($LegacyCounterDetected) {
+    if ($releaseVersion -ge $AwgCRemovedVersion) {
+      Write-Warn "Legacy CPS tag <c> was detected. It is unsupported by the selected release (v$AwgCRemovedVersion+); remove only <c> from i1-i5."
+    } else {
+      Write-Warn "Legacy CPS tag <c> was detected. This old release accepts it, but v$AwgCRemovedVersion+ does not."
+    }
+  }
+  Write-Host '  tailscale awg get        # Show the current profile and JSON'
+  if ($supportsV3) {
+    Write-Host '  tailscale awg validate   # Validate the current profile'
+    Write-Host '  tailscale awg sync       # Sync a compatible v2/v3 profile'
+  } else {
+    Write-Host '  tailscale awg sync       # Sync a compatible AWG v2 profile'
+  }
+  Write-Host '  tailscale awg reset      # Disable AWG and use standard WireGuard'
+}
+
 function Wait-ServiceStatus([string]$Name, [ValidateSet('Running', 'Stopped')][string]$Status, [int]$TimeoutSec = 30) {
   $sw = [Diagnostics.Stopwatch]::StartNew()
   while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
@@ -246,6 +291,7 @@ function Test-PeArchitecture([string]$Path, [string]$ExpectedArch) {
 
 #region Path Resolution and Official Install
 # Resolve install paths
+$LegacyCpsCounterDetected = Test-LegacyCpsCounterTag
 $defaultDir = if ($InstallDir -and $InstallDir.Trim()) { $InstallDir } else { "$Env:ProgramFiles\Tailscale" }
 $tsCmd = Get-Command tailscale.exe -ErrorAction SilentlyContinue
 $tsPath = if ($tsCmd) { $tsCmd.Source } else { "$defaultDir\tailscale.exe" }
@@ -553,9 +599,5 @@ Write-Host ''
 Write-Host 'Quick Start:'
 Write-Host '  tailscale up'
 Write-Host ''
-Write-Host 'Amnezia-WG commands (awg = amnezia-wg):'
-Write-Host '  tailscale awg set        # Configure obfuscation (auto-generate with Enter)'
-Write-Host '  tailscale awg get        # Show current config'
-Write-Host '  tailscale awg sync       # Sync config from other nodes'
-Write-Host '  tailscale awg reset      # Disable obfuscation'
+Show-AwgGuidance -ReleaseTag $Version -LegacyCounterDetected $LegacyCpsCounterDetected
 Write-Host ''

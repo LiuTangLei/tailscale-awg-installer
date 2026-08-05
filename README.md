@@ -1,236 +1,259 @@
-# Tailscale with Amnezia-WG 2.0
+# Tailscale with AmneziaWG v2 and v3
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
 [![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android%20|%20iOS-blue)](#platform-support)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](LICENSE)
 
-Enhanced Tailscale client with Amnezia-WG 2.0 obfuscation: junk traffic, protocol signatures, and handshake/header masquerading to resist DPI and blocking. It works with the official Tailscale control server and Headscale; no custom control server is required. Until you enable AWG settings, it behaves like standard Tailscale. Junk traffic and CPS signature modes interoperate with standard Tailscale peers, while handshake/header masquerading requires matching AWG settings on AWG peers.
+This project installs a Tailscale fork with AmneziaWG obfuscation while retaining the official Tailscale and Headscale control-plane behavior. With every AWG field disabled it behaves like standard Tailscale.
+
+Release `v1.102.2` and newer support both profiles:
+
+- **AWG v3 (recommended)**: header protection, transport content padding, randomized timing ranges, junk traffic, CPS packets, and header/handshake masquerading.
+- **AWG v2 (compatibility mode)**: the existing `jc`, `jmin`, `jmax`, `s1`-`s4`, `h1`-`h4`, and `i1`-`i5` profile format remains supported.
+
+The one v2 exception is the legacy CPS `<c>` packet-counter tag. AmneziaWG upstream removed it while refactoring the AWG 2 implementation in `amneziawg-go v0.2.16`. This fork picked up the change in Tailscale `v1.98.5` through `wireguard-go v0.0.20`, which merged upstream `amneziawg-go v0.2.17`. Remove only `<c>` from old `i1`-`i5` values; the other v2 fields remain compatible.
 
 Languages: [English](README.md) | [中文](doc/README-zh.md) | [فارسی](doc/README-fa.md) | [Русский](doc/README-ru.md)
 
-Legacy AWG 1.5 archive: [doc/README-awg-v1.5.md](doc/README-awg-v1.5.md).
+Historical AWG 1.5 notes: [doc/README-awg-v1.5.md](doc/README-awg-v1.5.md).
 
 ## Installation
+
+The installers select the latest stable fork release by default. Where the platform installation model permits, they preserve the existing CLI/service state and AWG preferences, inspect an accessible old profile for `<c>`, install matching client/daemon binaries, and print version-aware v2/v3 guidance. They never generate or overwrite an AWG profile automatically. Switching macOS from Tailscale.app to the CLI/utun service still requires re-authentication because those installation models do not share state.
 
 | Platform | Command / Action |
 | --- | --- |
 | Linux | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh \| bash` |
-| macOS* | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash` |
+| macOS | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash` |
 | Windows (Admin PowerShell) | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
-| OpenWrt | See [OpenWrt Installation](#openwrt-installation) |
-| Android | Download APK from [releases](https://github.com/LiuTangLei/tailscale-android/releases) |
-| iOS | Experimental open-source client: see [AwgScale](https://github.com/LiuTangLei/AwgScale) (TrollStore or Packet Tunnel entitlement signing required) |
+| OpenWrt | See [OpenWrt](#openwrt) |
+| Android | Download the APK from [tailscale-android releases](https://github.com/LiuTangLei/tailscale-android/releases) |
+| iOS | Experimental [AwgScale](https://github.com/LiuTangLei/AwgScale); TrollStore or Packet Tunnel entitlement signing is required |
 
-- macOS: the installer uses CLI-only `tailscaled`. If the official Tailscale.app is detected, you'll be prompted to remove it to avoid conflicts.
-- Android and iOS mobile clients support manual AWG setup and syncing AWG settings from other nodes.
-- iOS: AwgScale is experimental and self-managed. It is not available on the App Store; the current IPA targets TrollStore, or a normal Apple signing path with the Packet Tunnel entitlement.
-
-![Android AWG Sync Example](doc/sync1.jpg)
-
-## Docker Compose
-
-The repository includes `docker-compose.yml` for running `tailscaled` with AWG support.
-
-- State is stored in `./tailscale-state` next to the compose file, so node state and AWG settings survive container restarts and host reboots.
-- If you are upgrading from the old bind mount `/var/lib/tailscale:/var/lib/tailscale`, copy the existing state first:
-
-```bash
-docker compose down
-cp -a /var/lib/tailscale ./tailscale-state
-# update docker-compose.yml
-docker compose up -d
-```
-
-Basic flow:
-
-1. Start the service: `docker compose up -d`
-2. Authenticate inside the container: `docker compose exec tailscaled tailscale up`
-3. Run AWG commands the same way, for example: `docker compose exec tailscaled tailscale awg sync`
-
-If you use Headscale, add `--login-server https://your-headscale-domain` to `tailscale up`.
-
-Note the two names: the Compose service/container is `tailscaled`, and the CLI binary inside the container is `tailscale`. So the direct Docker form is:
-
-```bash
-docker exec -it tailscaled tailscale status
-```
-
-`docker exec tailscale status` is not equivalent: Docker would look for a container named `tailscale`, then try to run `status` as a program.
-
-To use `tailscale ...` directly on the Linux host, persist an alias in your shell startup file:
-
-```bash
-printf "\nalias tailscale='docker exec -it tailscaled tailscale'\n" >> ~/.bashrc && . ~/.bashrc
-```
-
-For Zsh, use `~/.zshrc` instead:
-
-```bash
-printf "\nalias tailscale='docker exec -it tailscaled tailscale'\n" >> ~/.zshrc && . ~/.zshrc
-```
-
-Then run:
-
-```bash
-tailscale up
-tailscale awg get
-```
-
-## OpenWrt Installation
-
-Default command:
-
-```bash
-wget -O /usr/bin/install.sh https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install_en.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh
-```
-
-Mirror command for regions with restricted GitHub access:
-
-```bash
-wget -O /usr/bin/install.sh https://ghfast.top/https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh
-```
-
-This script is forked from [GuNanOvO/openwrt-tailscale](https://github.com/GuNanOvO/openwrt-tailscale).
-
-## Mirrors
-
-If GitHub is slow or blocked, you can self-host a prefix mirror such as `https://your-mirror-site.com`:
+To install a specific published release:
 
 ```bash
 # Linux
-curl -fsSL https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --mirror https://your-mirror-site.com
+curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --version v1.102.2
 
 # macOS
-curl -fsSL https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash -s -- --mirror https://your-mirror-site.com
+curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash -s -- --version v1.102.2
 ```
 
 ```powershell
-# Windows
-$scriptContent = (iwr -useb https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1).Content; $scriptBlock = [scriptblock]::Create($scriptContent); & $scriptBlock -MirrorPrefix 'https://your-mirror-site.com/'
+# Windows, in an Administrator PowerShell
+$code = (iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1).Content
+& ([scriptblock]::Create($code)) -Version v1.102.2
 ```
 
-If PowerShell blocks execution, use `Set-ExecutionPolicy RemoteSigned` or `Bypass -Scope Process`.
+macOS uses CLI-only `tailscaled` with a utun interface. The installer detects an existing App Store/standalone Tailscale app and asks before removing the conflicting app/system-extension installation.
 
-## Quick Start
+## Quick start
 
-Tip: `tailscale amnezia-wg` is the same as `tailscale awg`.
-
-1. Log in:
+Log in using the normal control server:
 
 ```bash
-# Official control server
+# Official Tailscale
 tailscale up
 
 # Headscale
 tailscale up --login-server https://your-headscale-domain
 ```
 
-2. Configure AWG:
+Generate a profile:
 
 ```bash
 tailscale awg set
 ```
 
-Press Enter at the auto-generation prompt to generate recommended values for everything except `i1`-`i5`.
+On `v1.102.2+`, the interactive generator offers:
 
-3. On other devices, sync the same AWG config from this already-configured node:
+1. **AWG v3** — recommended and selected when you press Enter.
+2. **AWG v2** — select `2` for older peers and mobile/router clients that do not yet contain a v3-capable core.
 
-- CLI platforms (Linux/macOS/Windows/OpenWrt): run `tailscale awg sync` on the other device
-- Android and iOS (AwgScale): use the in-app AWG controls to set values manually or sync settings from another node
-
-4. Verify or reset when needed:
+The generated JSON is shown before it is applied. Keep that JSON as the source of truth. Apply it to the other participating nodes, or run `tailscale awg sync` from a compatible online peer.
 
 ```bash
 tailscale awg get
+tailscale awg validate # v1.102.2+
+tailscale awg sync
 tailscale awg reset
 ```
 
-## Configuration Presets
+## Compatibility matrix
 
-| Goal | Example | Compatibility |
+| Local/peer profile | Requirement | Result |
 | --- | --- | --- |
-| Basic junk traffic | `tailscale awg set '{"jc":4,"jmin":64,"jmax":256}'` | Works with standard Tailscale peers |
-| Junk traffic + signatures | `tailscale awg set '{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0x40><r 12>"}'` | Works with standard Tailscale peers |
-| Handshake masquerading | `tailscale awg set '{"s1":10,"s2":15,"s3":8,"s4":0}'` | All AWG nodes must use the same `s1`-`s4` |
-| Full masquerading | `tailscale awg set '{"s1":10,"s2":15,"s3":8,"s4":0,"h1":{"min":100000,"max":200000},"h2":{"min":300000,"max":350000},"h3":{"min":400000,"max":450000},"h4":{"min":500000,"max":550000}}'` | All AWG nodes must use the same `s1`-`s4` and `h1`-`h4` |
-| Full masquerading + signatures | `tailscale awg set '{"s1":10,"s2":15,"s3":8,"s4":0,"h1":{"min":100000,"max":200000},"h2":{"min":300000,"max":350000},"h3":{"min":400000,"max":450000},"h4":{"min":500000,"max":550000},"i1":"<b 0xc0><r 32><c><t>"}'` | `i1`-`i5` may differ per node; `s1`-`s4` and `h1`-`h4` must match |
+| All AWG fields disabled | Any standard Tailscale/WireGuard peer | Standard WireGuard behavior |
+| Only `jc`/`jmin`/`jmax` or `i1`-`i5` | May differ per node | Extra pre-handshake junk; standard peers ignore it |
+| AWG v2 `s1`-`s4` and `h1`-`h4` | All communicating AWG peers use matching values | AWG v2 communication |
+| AWG v3 | Every communicating peer has a v3-capable core and matching shared fields | AWG v3 communication |
+| AWG v2 profile on `v1.102.2+` | No `<c>` tag | Supported; applying v2 clears stale v3-only state |
+| Legacy profile containing `<c>` | Unsupported since this fork's `v1.98.5` | Remove `<c>` before applying or syncing |
 
-## Parameter Reference
+Do not enable a v3 profile on only one side. A v3-capable binary can run either v2 or v3, but communicating nodes must use compatible active profiles.
 
-- `jc` with `jmin` and `jmax`: junk packet count and size range.
-- `i1`-`i5`: optional CPS (Custom Protocol Signature) chain for custom protocol-mimicking packets.
-- `s1`-`s4`: handshake padding or prefix fields; all AWG nodes must match.
-- `h1`-`h4`: header field ranges in the form `{"min": low, "max": high}`; either set all four or none. The ranges must not overlap, and all AWG nodes must match.
+## What AWG v3 adds
 
-Very large junk counts or long signature chains increase latency and bandwidth usage.
+AWG v3 retains all v2 fields and adds:
 
-## Platform Support
-
-| Platform | Arch | Status |
+| JSON field | Purpose | Coordination |
 | --- | --- | --- |
-| Linux | x86_64, ARM64 | ✅ Full |
-| macOS | Intel, Apple Silicon | ✅ Full |
-| Windows | x86_64, ARM64 | ✅ Installer |
-| OpenWrt | Various | ✅ Script |
-| Android | ARM64, ARM | ✅ APK (manual AWG + sync) |
-| iOS | iPhone/iPad (iOS 15+) | ✅ Experimental client (manual AWG + sync) |
+| `header_protection_key` | 32-byte key encoded as 64 hex characters for packet-header protection | Must match on communicating v3 nodes; non-zero key requires `s1`-`s4 >= 12` |
+| `content_padding_addition` | Random transport-content padding range | May differ per node |
+| `rekey_after_time` | Randomized rekey interval | Local timing; may differ |
+| `rekey_timeout` | Randomized handshake retry timeout | Local timing; may differ |
+| `reject_after_time` | Randomized session rejection limit | Local timing; may differ |
+| `keepalive_timeout` | Randomized keepalive timeout | Local timing; may differ |
+| `max_handshake_attempts` | Randomized handshake-attempt limit | Local behavior; may differ |
 
-## Advanced: CPS Protocol Signatures
+The v3 generator creates fresh ranges and a fresh header-protection key. Do not copy a fixed key from documentation; generate one profile and distribute its shared fields to the intended peers.
 
-CPS means Custom Protocol Signature. It lets you assemble custom obfuscation packets that can imitate arbitrary protocol headers; it is not limited to one specific protocol.
+## AWG v2 compatibility
 
-CPS format:
+These v2 fields remain supported in `v1.102.2+`:
+
+- `jc`, `jmin`, `jmax`: pre-handshake junk packet count and size.
+- `s1`-`s4`: packet prefixes/padding; must match across communicating AWG peers.
+- `h1`-`h4`: scalar values or `{ "min": ..., "max": ... }` ranges; keep all four distinct and matching.
+- `i1`-`i5`: optional CPS packets; may differ per node.
+
+Supported CPS tags are:
+
+- `<b 0xHEX>`: static bytes.
+- `<r N>`: random bytes.
+- `<rc N>`: random ASCII letters.
+- `<rd N>`: random decimal digits.
+- `<t>`: Unix timestamp.
+
+`<c>` is not supported. For example, migrate:
 
 ```text
-i{n} = <tag1><tag2>...<tagN>
+old: i1 = <b 0xc0><r 32><c><t>
+new: i1 = <b 0xc0><r 32><t>
 ```
 
-Tags:
+I1-I5 packets do not carry tunnel data and do not need to match on both sides. Removing `<c>` does not require changing the shared `s1`-`s4` or `h1`-`h4` values.
 
-- `<b 0xHEX>`: static bytes
-- `<r N>`: secure random bytes
-- `<c>`: counter
-- `<t>`: timestamp
+## Upgrade from older releases
 
-Example:
+1. Save the current version and profile:
 
-```text
-i1 = <b 0xf6ab3267fa><c><b 0xf6ab><t><r 10>
+   ```bash
+   tailscale version
+   tailscale awg get
+   ```
+
+2. Run the installer. Existing login state and preferences are preserved where the platform installation model permits it.
+3. If the installer reports `<c>`, remove only that tag and reapply the resulting JSON.
+4. Decide whether to keep v2 or migrate the whole communicating group to v3.
+5. For v3, upgrade every participating node to a v3-capable build, generate one v3 profile, then distribute/sync it.
+6. Restart `tailscaled`, the container, or the platform app/service after changing transport parameters.
+
+Upgrading the binary alone does not convert an active v2 profile into v3.
+
+## Docker Compose
+
+The included [docker-compose.yml](docker-compose.yml) uses `ltlei/tailscale-awg:latest` and persists state in `./tailscale-state`.
+
+When migrating from the older host bind mount `/var/lib/tailscale:/var/lib/tailscale`, copy the contents before starting the new Compose definition:
+
+```bash
+docker compose down
+mkdir -p ./tailscale-state
+cp -a /var/lib/tailscale/. ./tailscale-state/
 ```
 
-If `i1` is unset, `i2`-`i5` are skipped.
+```bash
+docker compose pull
+docker compose up -d
+docker compose exec tailscaled tailscale up
+docker compose exec tailscaled tailscale awg set
+```
+
+For Headscale, replace the login command with `docker compose exec tailscaled tailscale up --login-server https://your-headscale-domain`.
+
+Verify that the pulled image reports `v1.102.2` or newer before selecting v3:
+
+```bash
+docker compose exec tailscaled tailscale version
+```
+
+The Compose service/container is named `tailscaled`; the CLI binary inside it is `tailscale`:
+
+```bash
+docker exec -it tailscaled tailscale awg get
+```
+
+## OpenWrt
+
+```bash
+wget -O /usr/bin/install.sh https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install_en.sh
+chmod +x /usr/bin/install.sh
+/usr/bin/install.sh
+```
+
+For restricted GitHub access:
+
+```bash
+wget -O /usr/bin/install.sh https://ghfast.top/https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install.sh
+chmod +x /usr/bin/install.sh
+/usr/bin/install.sh
+```
+
+OpenWrt, Android, and iOS are released separately. Check the actual client/core version before syncing a v3 profile; use v2 when any participating client is not yet v3-capable.
+
+## Mirrors
+
+The Linux/macOS installers accept `--mirror PREFIX`; Windows accepts `-MirrorPrefix`:
+
+```bash
+curl -fsSL https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --mirror https://your-mirror-site.com
+```
+
+```powershell
+$code = (iwr -useb https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1).Content
+& ([scriptblock]::Create($code)) -MirrorPrefix 'https://your-mirror-site.com'
+```
 
 ## Troubleshooting
 
-Verify installation:
+Check that the client and daemon are the same version:
 
 ```bash
 tailscale version
 tailscale awg get
+tailscale awg validate # v1.102.2+
 ```
 
-If connectivity breaks, reset to standard WireGuard and start from a simple preset:
+If `tailscale ping` works but normal traffic does not, remember that the default `tailscale ping` is a disco-layer check and does not pass through both TUN devices. Reset AWG and restore parameters progressively:
 
 ```bash
 tailscale awg reset
 tailscale awg set '{"jc":2,"jmin":64,"jmax":128}'
-sudo journalctl -u tailscaled -f
 ```
 
-On Windows PowerShell, prefer interactive setup to avoid JSON escaping issues:
+If a synced historical profile fails, search `i1`-`i5` for `<c>`, correct the source node first, and sync again.
 
-```powershell
-tailscale awg set
-```
+## Platform support
 
-## Links & Support
+| Platform | Architecture | Installer/status |
+| --- | --- | --- |
+| Linux | x86_64, ARM64 | Installer in this repository |
+| macOS | Intel, Apple Silicon | CLI/utun installer in this repository |
+| Windows | x86_64, ARM64 | Administrator PowerShell installer |
+| OpenWrt | Release-dependent | Separate installer repository |
+| Android | ARM64, ARM | Separate APK release |
+| iOS | iPhone/iPad | Experimental separate client |
 
-- Releases: <https://github.com/LiuTangLei/tailscale/releases>
+## Links
+
+- Tailscale fork releases: <https://github.com/LiuTangLei/tailscale/releases>
 - Android APK: <https://github.com/LiuTangLei/tailscale-android/releases>
-- iOS client (AwgScale): <https://github.com/LiuTangLei/AwgScale>
+- iOS client: <https://github.com/LiuTangLei/AwgScale>
 - Installer issues: <https://github.com/LiuTangLei/tailscale-awg-installer/issues>
-- Amnezia-WG docs: <https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted/#how-to-extract-a-protocol-signature-for-amneziawg-manually>
+- AmneziaWG upstream: <https://github.com/amnezia-vpn/amneziawg-go>
 
 ## License
 
-BSD 3-Clause License, same as upstream Tailscale.
+BSD 3-Clause License, matching upstream Tailscale.

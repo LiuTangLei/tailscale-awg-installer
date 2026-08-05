@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Linux installer: replace official Tailscale with Amnezia-WG-enabled binaries
+# Linux installer: replace official Tailscale with AWG v2/v3-enabled binaries
 # Usage: curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash
 
 set -euo pipefail
@@ -7,6 +7,8 @@ set -euo pipefail
 # Constants
 readonly REPO="LiuTangLei/tailscale"
 readonly INSTALL_DIR="/usr/local/bin"
+readonly AWG_C_REMOVED_VERSION="1.98.5"
+readonly AWG_V3_MIN_VERSION="1.102.2"
 
 # Colors
 readonly R='\033[31m' G='\033[32m' Y='\033[33m' B='\033[34m' N='\033[0m'
@@ -70,6 +72,16 @@ tag_is_newer_than() {
 	((c_patch > cur_patch))
 }
 
+version_at_least() {
+	local current="$1" minimum="$2"
+	local cur_major cur_minor cur_patch min_major min_minor min_patch
+	if ! read -r cur_major cur_minor cur_patch < <(version_parts "${current}"); then return 1; fi
+	if ! read -r min_major min_minor min_patch < <(version_parts "${minimum}"); then return 1; fi
+	if ((cur_major != min_major)); then ((cur_major > min_major)); return; fi
+	if ((cur_minor != min_minor)); then ((cur_minor > min_minor)); return; fi
+	((cur_patch >= min_patch))
+}
+
 select_highest_version_tag() {
 	local best="" tag
 	while IFS= read -r tag; do
@@ -125,6 +137,7 @@ stop_disable_tailscaled() {
 
 # Global variables
 DISTRO="" PACKAGE_MANAGER="" SUDO="" RELEASE_TAG="latest" MIRROR_PREFIX="" FALLBACK_BINARY=false ACTION="install" OFFICIAL_VERSION="" PRE_RELEASE=false
+LEGACY_CPS_COUNTER_DETECTED=false
 TMP_DIRS=() TMP_FILES=()
 CURL_HTTP1_FLAG=""
 
@@ -665,9 +678,49 @@ health_check_tailscaled() {
 	return 1
 }
 
+# Read the current profile before replacing binaries. This is a read-only
+# migration check; the installer never rewrites AWG preferences automatically.
+capture_awg_migration_state() {
+	command -v tailscale &>/dev/null || return 0
+	local config=""
+	config=$(tailscale awg get 2>/dev/null || tailscale amnezia-wg get 2>/dev/null || true)
+	if [[ ${config} == *"<c>"* ]]; then
+		LEGACY_CPS_COUNTER_DETECTED=true
+	fi
+}
+
+show_awg_guidance() {
+	local release_version="${OFFICIAL_VERSION:-${RELEASE_TAG}}" supports_v3=false
+	echo -e "Amnezia-WG commands (awg = amnezia-wg):"
+	if version_at_least "${release_version}" "${AWG_V3_MIN_VERSION}"; then
+		supports_v3=true
+		log G "AWG v3 is available; existing AWG v2 profiles remain supported."
+		echo -e "  tailscale awg set        # Enter = generate AWG v3; choose 2 for AWG v2"
+	else
+		log Y "This release predates AWG v3; install v${AWG_V3_MIN_VERSION} or newer for the v3 generator."
+		echo -e "  tailscale awg set        # Configure the AWG version supported by this release"
+	fi
+	if [[ ${LEGACY_CPS_COUNTER_DETECTED} == true ]]; then
+		if version_at_least "${release_version}" "${AWG_C_REMOVED_VERSION}"; then
+			log Y "Legacy CPS tag <c> was detected. It is unsupported by the selected release (v${AWG_C_REMOVED_VERSION}+)."
+			log Y "Remove only <c> from i1-i5 before reapplying or syncing the profile."
+		else
+			log Y "Legacy CPS tag <c> was detected. This old release accepts it, but v${AWG_C_REMOVED_VERSION}+ does not."
+		fi
+	fi
+	echo -e "  tailscale awg get        # Show the current profile and JSON"
+	if [[ ${supports_v3} == true ]]; then
+		echo -e "  tailscale awg validate   # Validate the current profile"
+		echo -e "  tailscale awg sync       # Sync a compatible v2/v3 profile from an online peer"
+	else
+		echo -e "  tailscale awg sync       # Sync a compatible AWG v2 profile from an online peer"
+	fi
+	echo -e "  tailscale awg reset      # Disable AWG and use standard WireGuard"
+}
+
 # Main installation process
 main() {
-	echo "🔧 Tailscale Amnezia-WG 2.0 Installer"
+	echo "🔧 Tailscale Amnezia-WG v2/v3 Installer"
 
 	# Parse arguments
 	while [[ $# -gt 0 ]]; do
@@ -695,7 +748,7 @@ main() {
 Usage: $0 [OPTIONS]
 Options:
   --mirror PREFIX     Use GitHub mirror
-  --version TAG       Use specific GitHub release tag (e.g. v1.68.2)
+  --version TAG       Use specific GitHub release tag (e.g. v1.102.2)
   --pre-release      Install the latest pre-release version from GitHub
   --uninstall        Remove Tailscale (packages, binaries, config, state) and exit
   --help, -h         Show this help
@@ -710,6 +763,7 @@ EOF
 	done
 
 	detect_system
+	capture_awg_migration_state
 
 	if [[ ${ACTION} == "uninstall" ]]; then
 		uninstall_all
@@ -790,11 +844,7 @@ EOF
 
 	echo -e "Quick Start:"
 	echo -e "  tailscale up\n"
-	echo -e "Amnezia-WG commands (awg = amnezia-wg):"
-	echo -e "  tailscale awg set        # Configure obfuscation (auto-generate with Enter)"
-	echo -e "  tailscale awg get        # Show current config"
-	echo -e "  tailscale awg sync       # Sync config from other nodes"
-	echo -e "  tailscale awg reset      # Disable obfuscation"
+	show_awg_guidance
 }
 
 main "$@"

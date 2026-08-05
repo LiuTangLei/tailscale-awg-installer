@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# macOS-only installer: replace official Tailscale with Amnezia-WG-enabled binaries
+# macOS-only installer: replace official Tailscale with AWG v2/v3-enabled binaries
 # Automatically detects and handles conflicts with App Store/Standalone Tailscale variants.
 # Uses CLI (utun) variant for maximum compatibility. Supports Intel & Apple Silicon.
 #
@@ -16,6 +16,9 @@ REPO="LiuTangLei/tailscale"
 VERSION="latest"
 MIRROR_PREFIX="" # GitHub mirror prefix
 PRE_RELEASE=false
+AWG_C_REMOVED_VERSION="1.98.5"
+AWG_V3_MIN_VERSION="1.102.2"
+LEGACY_CPS_COUNTER_DETECTED=false
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -73,6 +76,16 @@ tag_is_newer_than() {
 	((c_patch > cur_patch))
 }
 
+version_at_least() {
+	local current="$1" minimum="$2"
+	local cur_major cur_minor cur_patch min_major min_minor min_patch
+	if ! read -r cur_major cur_minor cur_patch < <(version_parts "${current}"); then return 1; fi
+	if ! read -r min_major min_minor min_patch < <(version_parts "${minimum}"); then return 1; fi
+	if ((cur_major != min_major)); then ((cur_major > min_major)); return; fi
+	if ((cur_minor != min_minor)); then ((cur_minor > min_minor)); return; fi
+	((cur_patch >= min_patch))
+}
+
 select_highest_version_tag() {
 	local best="" tag
 	while IFS= read -r tag; do
@@ -93,6 +106,45 @@ require_arg() {
 		err "Missing value for ${option}"
 		exit 1
 	fi
+}
+
+# Read the existing profile before removing an App/CLI installation. This is a
+# read-only migration check; no AWG preference is changed by the installer.
+capture_awg_migration_state() {
+	command -v tailscale &>/dev/null || return 0
+	local config=""
+	config=$(tailscale awg get 2>/dev/null || tailscale amnezia-wg get 2>/dev/null || true)
+	if [[ ${config} == *"<c>"* ]]; then
+		LEGACY_CPS_COUNTER_DETECTED=true
+	fi
+}
+
+show_awg_guidance() {
+	local release_version="${VERSION}" supports_v3=false
+	echo "🔧 Amnezia-WG Commands (awg = amnezia-wg):"
+	if version_at_least "${release_version}" "${AWG_V3_MIN_VERSION}"; then
+		supports_v3=true
+		ok "AWG v3 is available; existing AWG v2 profiles remain supported."
+		echo "  tailscale awg set               # Enter = generate AWG v3; choose 2 for AWG v2"
+	else
+		warn "This release predates AWG v3; install v${AWG_V3_MIN_VERSION} or newer for the v3 generator."
+		echo "  tailscale awg set               # Configure the AWG version supported by this release"
+	fi
+	if [[ ${LEGACY_CPS_COUNTER_DETECTED} == true ]]; then
+		if version_at_least "${release_version}" "${AWG_C_REMOVED_VERSION}"; then
+			warn "Legacy CPS tag <c> was detected. It is unsupported by the selected release (v${AWG_C_REMOVED_VERSION}+); remove only <c> from i1-i5."
+		else
+			warn "Legacy CPS tag <c> was detected. This old release accepts it, but v${AWG_C_REMOVED_VERSION}+ does not."
+		fi
+	fi
+	echo "  tailscale awg get               # Show the current profile and JSON"
+	if [[ ${supports_v3} == true ]]; then
+		echo "  tailscale awg validate          # Validate the current profile"
+		echo "  tailscale awg sync              # Sync a compatible v2/v3 profile"
+	else
+		echo "  tailscale awg sync              # Sync a compatible AWG v2 profile"
+	fi
+	echo "  tailscale awg reset             # Disable AWG and use standard WireGuard"
 }
 
 # Note: Configuration backup removed as App/CLI variants use incompatible formats
@@ -798,12 +850,8 @@ usage() {
 	echo ""
 	ok "Installation completed successfully! 🎉"
 	echo ""
-	echo "🔧 Amnezia-WG Commands (awg = amnezia-wg):"
 	echo "  tailscale up                    # Connect to your network (re-auth required)"
-	echo "  tailscale awg set               # Configure obfuscation (auto-generate with Enter)"
-	echo "  tailscale awg get               # Show current config"
-	echo "  tailscale awg sync              # Sync config from other nodes"
-	echo "  tailscale awg reset             # Disable obfuscation"
+	show_awg_guidance
 	echo ""
 	echo "💡 Troubleshooting:"
 	echo "  • If commands not found, restart your terminal or run:"
@@ -816,7 +864,7 @@ usage() {
 }
 
 main() {
-	echo "🔧 macOS Installer (Amnezia-WG 2.0)"
+	echo "🔧 macOS Installer (Amnezia-WG v2/v3)"
 
 	# Parse arguments
 	local ACTION="install"
@@ -846,7 +894,7 @@ main() {
 Usage: $0 [OPTIONS]
 Options:
   --mirror PREFIX    Use GitHub mirror with specified prefix
-  --version TAG      Use specific GitHub release tag (e.g. v1.68.2)
+  --version TAG      Use specific GitHub release tag (e.g. v1.102.2)
   --pre-release     Install the latest pre-release version from GitHub
   --uninstall       Remove Tailscale (all variants, binaries, config, state) and exit
   --help, -h        Show this help
@@ -874,6 +922,7 @@ EOF
 	done
 
 	check_root
+	capture_awg_migration_state
 
 	if [[ ${ACTION} == "uninstall" ]]; then
 		uninstall_all

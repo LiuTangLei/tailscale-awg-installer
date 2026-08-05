@@ -1,6 +1,8 @@
 # Tailscale with Amnezia-WG 1.5
 
-> Legacy AWG 1.5 archive; new installations should use the main README.
+> Legacy AWG 1.5 archive; new installations should use the [main README](../README.md). Commands below describe the historical format, not the current recommended profile.
+
+> **Version boundary:** upstream AmneziaWG removed the CPS `<c>` counter while refactoring AWG 2 in `amneziawg-go v0.2.16`. This fork inherited that change in Tailscale `v1.98.5` through `wireguard-go v0.0.20` (with upstream `amneziawg-go v0.2.17`). On `v1.98.5` and newer, remove `<c>` before applying any archived profile. Other v2 fields remain supported, and `v1.102.2+` can generate either v3 (default) or v2.
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
 [![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20Android-blue)](https://github.com/LiuTangLei/tailscale/releases/latest)
@@ -105,7 +107,7 @@ tailscale awg set '{"s1":10,"s2":15}'
 tailscale awg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777}'
 
 # Combined with signatures (i1-i5 can be different per node)
-tailscale awg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777,"i1":"<b 0xc0><r 32><c><t>"}'
+tailscale awg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":987654321,"h4":555666777,"i1":"<b 0xc0><r 32><t>"}'
 ```
 
 ## 🎯 Configuration
@@ -177,8 +179,8 @@ tailscale awg set '{"s1":10,"s2":15,"h1":3946285740,"h2":1234567890,"h3":9876543
 
 1. Capture real traffic with Wireshark
 2. Extract hex patterns from headers
-3. Build format: `<b 0xHEX>` (static), `<r LENGTH>` (random), `<c>` (counter), `<t>` (timestamp)
-4. Example: `<b 0xc0000000><r 16><c><t>` = QUIC-like header + 16 random bytes + counter + timestamp
+3. Current format: `<b 0xHEX>` (static), `<r LENGTH>` (random), `<rc LENGTH>` (ASCII letters), `<rd LENGTH>` (decimal digits), `<t>` (timestamp)
+4. Example: `<b 0xc0000000><r 16><t>` = QUIC-like header + 16 random bytes + timestamp
 
 ### Obfuscation Packets I1–I5 (Signature Chain) & CPS (Custom Protocol Signature)
 
@@ -195,15 +197,18 @@ i{n} = <tag1><tag2><tag3>...<tagN>
 | Tag | Format         | Description                                 | Constraints      |
 | --- | -------------- | ------------------------------------------- | ---------------- |
 | b   | `<b hex_data>` | Static bytes to emulate protocols           | Arbitrary length |
-| c   | `<c>`          | Packet counter (32-bit, network byte order) | Unique per chain |
 | t   | `<t>`          | Unix timestamp (32-bit, network byte order) | Unique per chain |
 | r   | `<r length>`   | Cryptographically secure random bytes       | length ≤ 1000    |
+| rc  | `<rc length>`  | Random ASCII letters                        | positive length  |
+| rd  | `<rd length>`  | Random decimal digits                       | positive length  |
 
 **Example:**
 
 ```text
-i1 = <b 0xf6ab3267fa><c><b 0xf6ab><t><r 10>
+i1 = <b 0xf6ab3267fa><b 0xf6ab><t><r 10>
 ```
+
+Historical profiles may contain `<c>`, but current releases reject it. Delete only that tag; no matching peer fields need to change.
 
 > ⚠️ If i1 is not set, the entire chain (I2–I5) is skipped.
 
