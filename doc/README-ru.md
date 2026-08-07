@@ -8,15 +8,13 @@
 
 Начиная с `v1.102.2` поддерживаются два профиля: **AWG v3** (рекомендуется; защита заголовка, padding содержимого и случайные диапазоны таймингов) и **AWG v2** для совместимости со старыми узлами.
 
-Единственное исключение совместимости v2 — старый CPS-тег счетчика `<c>`. Upstream AmneziaWG удалил его при переработке AWG 2 в `amneziawg-go v0.2.16`. Этот проект получил изменение в Tailscale `v1.98.5` через `wireguard-go v0.0.20`, куда был включен upstream `amneziawg-go v0.2.17`. Удалите только `<c>` из старых значений `i1`-`i5`; остальные параметры v2 продолжают поддерживаться.
-
 Языки: [English](../README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
 
 Архив старой версии AWG 1.5: [README-awg-v1.5.md](README-awg-v1.5.md).
 
 ## Установка
 
-Установщики выбирают последний стабильный релиз. Если это допускает модель установки платформы, они сохраняют состояние CLI/службы и AWG-настройки, только читают доступный старый профиль для поиска `<c>` и после установки показывают подсказку с учетом версии. Они не создают и не перезаписывают AWG-профиль автоматически. При переходе macOS с Tailscale.app на службу CLI/utun потребуется повторная авторизация, потому что эти модели установки не используют общее состояние.
+Установщики выбирают последний стабильный релиз. Если это допускает модель установки платформы, они сохраняют состояние CLI/службы и AWG-настройки, выполняют проверку миграции только для чтения и после установки показывают подсказку с учетом версии. Они не создают и не перезаписывают AWG-профиль автоматически. При переходе macOS с Tailscale.app на службу CLI/utun потребуется повторная авторизация, потому что эти модели установки не используют общее состояние.
 
 | Платформа | Команда / действие |
 | --- | --- |
@@ -25,11 +23,11 @@
 | Windows | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
 | OpenWrt | См. [Установка OpenWrt](#установка-openwrt) |
 | Android | Загрузите APK из [releases](https://github.com/LiuTangLei/tailscale-android/releases) |
-| iOS | Экспериментальный open-source клиент: [AwgScale](https://github.com/LiuTangLei/AwgScale) (нужен TrollStore или подпись с Packet Tunnel entitlement) |
+| iOS | Экспериментальный [AwgScale](https://github.com/LiuTangLei/AwgScale); системный VPN требует TrollStore или подпись с Packet Tunnel entitlement |
 
-- macOS: установщик использует CLI-версию `tailscaled`. Если обнаружен официальный Tailscale.app, будет предложено удалить его во избежание конфликтов.
+- macOS: установщик использует CLI-версию `tailscaled`. Если обнаружен официальный Tailscale.app, установщик запросит подтверждение и временно переместит App bundle для отката. Отключенное пользователем System/Network Extension нельзя включить обратно автоматически.
 - Мобильные клиенты Android и iOS поддерживают ручную настройку AWG и синхронизацию AWG-настроек с других узлов.
-- iOS: AwgScale является экспериментальным self-managed клиентом, не доступен в App Store; текущий IPA рассчитан на TrollStore или обычную подпись Apple с Packet Tunnel entitlement.
+- iOS: обычная подпись поддерживает app-only функции; системный VPN/AWG требует TrollStore или Packet Tunnel entitlement.
 
 ![Пример синхронизации AWG на Android](sync1.jpg)
 
@@ -38,13 +36,17 @@
 В репозитории есть `docker-compose.yml` для запуска `tailscaled` с поддержкой AWG.
 
 - Состояние хранится в каталоге `./tailscale-state` рядом с compose-файлом, поэтому состояние узла и параметры AWG сохраняются после перезапуска контейнера и перезагрузки хоста.
-- Если вы переходите со старого bind mount `/var/lib/tailscale:/var/lib/tailscale`, сначала скопируйте существующее состояние:
+- Если вы переходите со старого bind mount `/var/lib/tailscale:/var/lib/tailscale`, перед копированием остановите все процессы, использующие это состояние. Нельзя одновременно запускать host daemon и контейнер с одним состоянием узла:
 
 ```bash
 docker compose down
+# Если host-служба использует тот же каталог, выберите подходящий init:
+# systemd: sudo systemctl stop tailscaled
+# OpenRC:  sudo rc-service tailscaled stop || sudo rc-service tailscale stop
 mkdir -p ./tailscale-state
 cp -a /var/lib/tailscale/. ./tailscale-state/
 # обновите docker-compose.yml
+docker compose pull
 docker compose up -d
 ```
 
@@ -53,6 +55,8 @@ docker compose up -d
 1. Поднимите сервис: `docker compose up -d`
 2. Авторизуйтесь в контейнере: `docker compose exec tailscaled tailscale up`
 3. Выполняйте AWG-команды так же, например: `docker compose exec tailscaled tailscale awg sync`
+
+Перед выбором v3 проверьте `docker compose exec tailscaled tailscale version`: версия core должна быть не ниже `v1.102.2`.
 
 Если вы используете Headscale, добавьте к `tailscale up` параметр `--login-server https://your-headscale-domain`.
 
@@ -145,6 +149,8 @@ tailscale awg set
 - CLI-платформы (Linux/macOS/Windows/OpenWrt): `tailscale awg sync`
 - Android и iOS (AwgScale): настройте AWG вручную в приложении или синхронизируйте настройки с другого узла
 
+После успешного `tailscale awg set` или `tailscale awg sync` следуйте запросу перезапуска; `v1.102.2` по умолчанию рекомендует перезапуск после обеих команд.
+
 4. Проверяйте или сбрасывайте настройки при необходимости:
 
 ```bash
@@ -168,7 +174,7 @@ tailscale awg reset
 - `jc`, `jmin`, `jmax`: количество и размер мусорных пакетов.
 - `i1`-`i5`: необязательная CPS-цепочка сигнатур.
 - `s1`-`s4`: поля префикса или padding в рукопожатии; должны совпадать у всех AWG-узлов.
-- `h1`-`h4`: диапазоны полей заголовков в виде `{"min": low, "max": high}`. Либо задаются все четыре, либо ни один. Диапазоны не должны пересекаться и должны совпадать у всех AWG-узлов.
+- `h1`-`h4`: диапазоны полей заголовков в виде `{"min": low, "max": high}`. Эффективные диапазоны не должны пересекаться, а общие значения должны совпадать у всех AWG-узлов.
 
 AWG v3 также добавляет `header_protection_key`, `content_padding_addition`, `rekey_after_time`, `rekey_timeout`, `reject_after_time`, `keepalive_timeout` и `max_handshake_attempts`. Ключ защиты заголовка и общие поля должны совпадать у взаимодействующих v3-узлов; локальные диапазоны padding и таймингов могут отличаться. Не включайте v3 только на одной стороне соединения.
 
@@ -181,8 +187,8 @@ AWG v3 также добавляет `header_protection_key`, `content_padding_a
 | Linux | x86_64, ARM64 | ✅ Полная |
 | macOS | Intel, Apple Silicon | ✅ Полная |
 | Windows | x86_64, ARM64 | ✅ Установщик |
-| OpenWrt | Различные | ✅ Скрипт |
-| Android | ARM64, ARM | ✅ APK (ручная настройка AWG + sync) |
+| OpenWrt | Различные | Отдельный релиз; проверьте версию core |
+| Android | Universal APK (ARM64, ARM, x86_64, x86) | ✅ Ручная настройка AWG + sync |
 | iOS | iPhone/iPad (iOS 15+) | ✅ Экспериментальный клиент (ручная настройка AWG + sync) |
 
 OpenWrt, Android и iOS публикуются отдельно. Перед синхронизацией v3 проверьте фактическую версию клиента/ядра; если хотя бы один узел еще не поддерживает v3, используйте v2.
@@ -195,7 +201,7 @@ OpenWrt, Android и iOS публикуются отдельно. Перед си
 i{n} = <tag1><tag2>...<tagN>
 ```
 
-Теги:
+Распространенные теги:
 
 - `<b 0xHEX>`: статические байты
 - `<r N>`: криптографически стойкие случайные байты
@@ -209,9 +215,7 @@ i{n} = <tag1><tag2>...<tagN>
 i1 = <b 0xf6ab3267fa><b 0xf6ab><t><r 10>
 ```
 
-Если `i1` не задан, `i2`-`i5` пропускаются.
-
-Тег `<c>` не поддерживается начиная с `v1.98.5`. Например, замените `<b 0xc0><r 32><c><t>` на `<b 0xc0><r 32><t>`. Изменять общие `s1`-`s4` или `h1`-`h4` при этом не нужно.
+> Совместимость: AmneziaWG удалил старый счетчик CPS `<c>` при переработке AWG 2 в `amneziawg-go v0.2.16`; этот fork унаследовал изменение в `v1.98.1`, поэтому удалите этот тег из старых значений `i1`-`i5`.
 
 ## Устранение неполадок
 

@@ -11,15 +11,17 @@
 - **AWG v3（推荐）**：增加头部保护、传输内容填充、随机时序范围，并保留垃圾包、CPS、握手及消息头混淆。
 - **AWG v2（兼容模式）**：继续支持原有 `jc`、`jmin`、`jmax`、`s1`-`s4`、`h1`-`h4`、`i1`-`i5` 配置格式。
 
-v2 唯一例外是旧 CPS `<c>` 计数器标签。AmneziaWG 上游在 `amneziawg-go v0.2.16` 重构 AWG 2 实现时将其移除；本项目在 Tailscale `v1.98.5` 更新到 `wireguard-go v0.0.20` 时引入了包含该变化的上游 `amneziawg-go v0.2.17`。旧配置只需从 `i1`-`i5` 删除 `<c>`，其余 v2 参数仍然兼容。
-
 语言：[English](../README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
 
 AWG 1.5 历史说明：[README-awg-v1.5.md](README-awg-v1.5.md)。
 
 ## 安装
 
-安装器默认选择最新稳定版。在平台安装模型允许的情况下，它会保留现有 CLI/服务状态与 AWG 偏好，只读检查可访问的旧配置是否包含 `<c>`，安装相互匹配的客户端/守护进程，最后根据实际版本显示 v2/v3 指引。安装器不会自动生成或覆盖 AWG 配置。macOS 从 Tailscale.app 切换到 CLI/utun 服务时仍需重新登录，因为两种安装模型不共享状态。
+安装器默认选择最新稳定版。在平台安装模型允许的情况下，它会保留现有 CLI/服务状态与 AWG 偏好，执行只读迁移检查，安装相互匹配的客户端/守护进程，最后根据实际版本显示 v2/v3 指引。安装器不会自动生成或覆盖 AWG 配置。macOS 从 Tailscale.app 切换到 CLI/utun 服务时仍需重新登录，因为两种安装模型不共享状态。
+
+替换前，各桌面安装器都会检查架构与内嵌版本；能直接取得可信发布元数据且资产提供 GitHub SHA-256 摘要时，还会校验摘要。二进制替换事务会保留恢复副本与原服务配置；若回滚不完整，恢复副本会留在磁盘上而不会被清理。Linux 同时支持 systemd 与 OpenRC；Windows GUI 必须与 fork 的官方基础版本完全一致。
+
+Linux 发行版升级 Tailscale 软件包、或 macOS 升级 Homebrew formula 时，都可能重新写回官方二进制。若包更新后 AWG 命令消失，请重新运行安装器并再次确认 `tailscale version`。
 
 | 平台 | 命令 / 操作 |
 | --- | --- |
@@ -28,7 +30,7 @@ AWG 1.5 历史说明：[README-awg-v1.5.md](README-awg-v1.5.md)。
 | Windows（管理员 PowerShell） | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
 | OpenWrt | 见 [OpenWrt](#openwrt) |
 | Android | 从 [tailscale-android releases](https://github.com/LiuTangLei/tailscale-android/releases) 下载 APK |
-| iOS | 实验性 [AwgScale](https://github.com/LiuTangLei/AwgScale)，需要 TrollStore 或具有 Packet Tunnel 权限的签名 |
+| iOS | 实验性 [AwgScale](https://github.com/LiuTangLei/AwgScale)；普通签名可使用 app-only 功能，系统 VPN 需要 TrollStore 或 Packet Tunnel 权限 |
 
 指定已发布版本：
 
@@ -46,7 +48,7 @@ $code = (iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-in
 & ([scriptblock]::Create($code)) -Version v1.102.2
 ```
 
-macOS 安装器使用 CLI/utun 版本。检测到 App Store 或独立版 Tailscale.app 时，会在移除存在冲突的 App/系统扩展之前询问用户。
+macOS 安装器使用 CLI/utun 版本。检测到 App Store 或独立版 Tailscale.app 时，会先征得同意并暂存 App 以便回滚；迁移中由用户停用的 System/Network Extension 无法由脚本自动重新启用。
 
 ## 快速开始
 
@@ -88,8 +90,7 @@ tailscale awg reset
 | 仅 `jc`/`jmin`/`jmax` 或 `i1`-`i5` | 各节点可以不同 | 仅增加握手前垃圾包，标准节点会忽略 |
 | AWG v2 的 `s1`-`s4`、`h1`-`h4` | 通信节点使用一致值 | AWG v2 通信 |
 | AWG v3 | 所有通信节点都具备 v3 核心，并使用一致的共享字段 | AWG v3 通信 |
-| `v1.102.2+` 应用 v2 配置 | 不含 `<c>` | 支持，并会清除残留的 v3 专用状态 |
-| 历史配置含 `<c>` | 本项目从 `v1.98.5` 起不支持 | 删除 `<c>` 后再应用或同步 |
+| `v1.102.2+` 应用 v2 配置 | 使用受支持的 v2 字段 | 支持，并会清除残留的 v3 专用状态 |
 
 不能只在通信的一端启用 v3。支持 v3 的二进制可以运行 v2 或 v3，但双方当前生效的配置必须兼容。
 
@@ -115,10 +116,10 @@ v3 生成器会创建新的范围和头部保护密钥。不要复制 README 中
 
 - `jc`、`jmin`、`jmax`：握手前垃圾包数量与大小。
 - `s1`-`s4`：消息前缀/填充，通信节点必须一致。
-- `h1`-`h4`：支持单值或 `{ "min": ..., "max": ... }` 范围；四组值应互不冲突且保持一致。
+- `h1`-`h4`：支持单值或 `{ "min": ..., "max": ... }` 范围；实际范围不能重叠，共享值必须保持一致。
 - `i1`-`i5`：可选 CPS 包，各节点可以不同。
 
-当前支持的 CPS 标签：
+常用 CPS 标签包括：
 
 - `<b 0xHEX>`：固定字节。
 - `<r N>`：随机字节。
@@ -126,14 +127,7 @@ v3 生成器会创建新的范围和头部保护密钥。不要复制 README 中
 - `<rd N>`：随机十进制数字。
 - `<t>`：Unix 时间戳。
 
-不再支持 `<c>`。迁移示例：
-
-```text
-旧：i1 = <b 0xc0><r 32><c><t>
-新：i1 = <b 0xc0><r 32><t>
-```
-
-I1-I5 是握手前的额外包，不承载隧道数据，也不要求两端一致。删除 `<c>` 不需要修改共享的 `s1`-`s4` 或 `h1`-`h4`。
+> 兼容提示：AmneziaWG 在 `amneziawg-go v0.2.16` 重构 AWG 2 时移除了旧 CPS `<c>` 计数器；本项目从 `v1.98.1` 起继承该变化，旧 `i1`-`i5` 删掉该标签即可。
 
 ## 从旧版本升级
 
@@ -145,10 +139,9 @@ I1-I5 是握手前的额外包，不承载隧道数据，也不要求两端一�
    ```
 
 2. 运行安装器。平台安装方式允许的情况下，登录状态和偏好配置都会保留。
-3. 若安装器提示发现 `<c>`，只删除该标签并重新应用 JSON。
-4. 选择继续使用 v2，或让整组通信节点一起迁移到 v3。
-5. 使用 v3 时，先将所有参与节点升级到具备 v3 核心的版本，再生成一份 v3 配置并分发/同步。
-6. 更改传输参数后，重启 `tailscaled`、容器或对应平台的 App/服务。
+3. 选择继续使用 v2，或让整组通信节点一起迁移到 v3。
+4. 使用 v3 时，先将所有参与节点升级到具备 v3 核心的版本，再生成一份 v3 配置并分发/同步。
+5. 执行 `tailscale awg set` 或 `tailscale awg sync` 后按提示重启；`v1.102.2` 在两种命令成功后都默认建议重启。
 
 只升级二进制不会把当前生效的 v2 配置自动转换成 v3。
 
@@ -156,10 +149,13 @@ I1-I5 是握手前的额外包，不承载隧道数据，也不要求两端一�
 
 仓库中的 [docker-compose.yml](../docker-compose.yml) 使用 `ltlei/tailscale-awg:latest`，状态保存在 `./tailscale-state`。
 
-若从旧的宿主机挂载 `/var/lib/tailscale:/var/lib/tailscale` 迁移，请先停止容器并复制目录内容：
+若从旧的宿主机挂载 `/var/lib/tailscale:/var/lib/tailscale` 迁移，复制前应停止所有正在使用该状态的进程。不要让宿主机守护进程与容器同时使用同一节点状态。
 
 ```bash
 docker compose down
+# 若宿主机服务也使用此目录，按实际 init 系统选择：
+# systemd：sudo systemctl stop tailscaled
+# OpenRC： sudo rc-service tailscaled stop || sudo rc-service tailscale stop
 mkdir -p ./tailscale-state
 cp -a /var/lib/tailscale/. ./tailscale-state/
 ```
@@ -233,8 +229,6 @@ tailscale awg reset
 tailscale awg set '{"jc":2,"jmin":64,"jmax":128}'
 ```
 
-若同步历史配置后失败，检查 `i1`-`i5` 是否含 `<c>`；先修正作为配置源的节点，再重新同步。
-
 ## 平台支持
 
 | 平台 | 架构 | 安装器/状态 |
@@ -243,8 +237,8 @@ tailscale awg set '{"jc":2,"jmin":64,"jmax":128}'
 | macOS | Intel、Apple Silicon | 本仓库 CLI/utun 安装器 |
 | Windows | x86_64、ARM64 | 管理员 PowerShell 安装器 |
 | OpenWrt | 取决于独立发行版 | 独立安装器仓库 |
-| Android | ARM64、ARM | 独立 APK 发行 |
-| iOS | iPhone/iPad | 实验性独立客户端 |
+| Android | 通用 APK（ARM64、ARM、x86_64、x86） | 独立 APK 发行 |
+| iOS | iPhone/iPad（iOS 15+） | 实验性独立客户端；系统 VPN 需要 TrollStore 或 Packet Tunnel 权限 |
 
 ## 链接
 
