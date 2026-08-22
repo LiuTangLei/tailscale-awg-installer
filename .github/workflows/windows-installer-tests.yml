@@ -1,0 +1,29 @@
+name: Windows installer tests
+
+on:
+  push:
+    paths:
+      - install-windows.ps1
+      - tests/install-windows-process-management.ps1
+      - .github/workflows/windows-installer-tests.yml
+  pull_request:
+    paths:
+      - install-windows.ps1
+      - tests/install-windows-process-management.ps1
+      - .github/workflows/windows-installer-tests.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  process-management:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test with Windows PowerShell 5.1
+        shell: powershell
+        run: .\tests\install-windows-process-management.ps1
+      - name: Test with PowerShell 7
+        shell: pwsh
+        run: .\tests\install-windows-process-management.ps1

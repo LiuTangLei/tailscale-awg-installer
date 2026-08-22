@@ -48,6 +48,8 @@ $code = (iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-in
 & ([scriptblock]::Create($code)) -Version v1.102.2
 ```
 
+The Windows installer can run while the normal Tailscale service is active. It validates the service-owned process tree, then stops and restarts the service during the transactional update. Only an independent `tailscaled.exe` outside that process tree must be stopped manually.
+
 macOS uses CLI-only `tailscaled` with a utun interface. The installer asks before migrating an App Store/standalone Tailscale app and stages the App bundle for rollback; macOS cannot automatically re-enable a System/Network Extension that the user disabled during migration.
 
 ## Quick start

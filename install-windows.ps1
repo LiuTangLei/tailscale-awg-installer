@@ -197,23 +197,94 @@ function Get-SafeTailscaledServicePath([string]$CommandLine) {
   }
 }
 
-function Assert-TailscaledProcessesManaged {
-  try {
-    $processes = @(Get-CimInstance Win32_Process -Filter "Name='tailscaled.exe'" -ErrorAction Stop)
-  } catch {
-    throw "Could not inspect running tailscaled processes safely: $($_.Exception.Message)"
+function Get-TailscaledProcessValidationError([object[]]$Processes, [object]$Service) {
+  $processes = @($Processes)
+  $servicePid = if ($service) { [uint32]$service.ProcessId } else { [uint32]0 }
+  if ($processes.Count -eq 0) {
+    if ($servicePid -ne 0) {
+      return "The Tailscale service reports PID $servicePid, but no tailscaled.exe process could be inspected"
+    }
+    return
   }
-  if ($processes.Count -eq 0) { return }
 
-  $service = Get-CimInstance Win32_Service -Filter "Name='Tailscale'" -ErrorAction SilentlyContinue
-  if (-not $service -or [uint32]$service.ProcessId -eq 0) {
-    throw 'An unmanaged tailscaled.exe process is running; stop it before retrying'
+  if ($servicePid -eq 0) {
+    return 'An unmanaged tailscaled.exe process is running; stop it before retrying'
   }
+
+  $servicePath = Get-SafeTailscaledServicePath -CommandLine $service.PathName
+  $processesByPid = @{}
   foreach ($process in $processes) {
-    if ([uint32]$process.ProcessId -ne [uint32]$service.ProcessId) {
-      throw "An extra unmanaged tailscaled.exe process is running (PID $($process.ProcessId)); stop it before retrying"
+    $processesByPid[[string][uint32]$process.ProcessId] = $process
+  }
+  if (-not $processesByPid.ContainsKey([string]$servicePid)) {
+    return "The Tailscale service reports PID $servicePid, but that tailscaled.exe process could not be inspected"
+  }
+
+  $serviceProcess = $processesByPid[[string]$servicePid]
+  if (-not [string]::IsNullOrWhiteSpace([string]$serviceProcess.ExecutablePath) -and
+      -not (Test-SamePath -Left $serviceProcess.ExecutablePath -Right $servicePath)) {
+    return "The Tailscale service PID $servicePid uses an unexpected executable path"
+  }
+
+  # SCM tracks the tailscaled service parent. That parent normally starts
+  # same-binary /subproc (and sometimes /firewall) descendants, so their PIDs
+  # are expected to differ from Win32_Service.ProcessId. Accept only the
+  # descendant tree; when CIM exposes ExecutablePath, require the same binary.
+  # An independent tailscaled root remains unsafe.
+  $managedPids = @{}
+  $managedPids[[string]$servicePid] = $true
+  $added = $true
+  while ($added) {
+    $added = $false
+    foreach ($process in $processes) {
+      $processId = [uint32]$process.ProcessId
+      $processIdKey = [string]$processId
+      if ($managedPids.ContainsKey($processIdKey)) { continue }
+
+      $parentKey = [string][uint32]$process.ParentProcessId
+      if (-not $managedPids.ContainsKey($parentKey)) { continue }
+      if (-not [string]::IsNullOrWhiteSpace([string]$process.ExecutablePath) -and
+          -not (Test-SamePath -Left $process.ExecutablePath -Right $servicePath)) {
+        return "A tailscaled.exe descendant uses an unexpected executable path (PID $processId)"
+      }
+      $managedPids[$processIdKey] = $true
+      $added = $true
     }
   }
+
+  foreach ($process in $processes) {
+    $processId = [uint32]$process.ProcessId
+    if (-not $managedPids.ContainsKey([string]$processId)) {
+      return "An extra unmanaged tailscaled.exe process is running (PID $processId, parent PID $($process.ParentProcessId)); stop it before retrying"
+    }
+  }
+}
+
+function Assert-TailscaledProcessesManaged {
+  $lastError = $null
+  for ($attempt = 1; $attempt -le 3; $attempt++) {
+    try {
+      # Read the service on both sides of the process snapshot. If its PID
+      # changed, SCM restarted it mid-query and the snapshot is not reliable.
+      $serviceBefore = Get-CimInstance Win32_Service -Filter "Name='Tailscale'" -ErrorAction Stop
+      $processes = @(Get-CimInstance Win32_Process -Filter "Name='tailscaled.exe'" -ErrorAction Stop)
+      $serviceAfter = Get-CimInstance Win32_Service -Filter "Name='Tailscale'" -ErrorAction Stop
+    } catch {
+      throw "Could not inspect running tailscaled processes safely: $($_.Exception.Message)"
+    }
+
+    $beforePid = if ($serviceBefore) { [uint32]$serviceBefore.ProcessId } else { [uint32]0 }
+    $afterPid = if ($serviceAfter) { [uint32]$serviceAfter.ProcessId } else { [uint32]0 }
+    if ($beforePid -ne $afterPid) {
+      $lastError = 'The Tailscale service restarted while its processes were being inspected'
+    } else {
+      $lastError = Get-TailscaledProcessValidationError -Processes $processes -Service $serviceAfter
+      if ([string]::IsNullOrWhiteSpace([string]$lastError)) { return }
+    }
+
+    if ($attempt -lt 3) { Start-Sleep -Milliseconds 200 }
+  }
+  throw $lastError
 }
 
 function Get-TailscaleGuiPaths {
@@ -325,6 +396,15 @@ function Wait-ServiceAbsent([string]$Name, [int]$TimeoutSec = 30) {
     Start-Sleep -Milliseconds 400
   }
   return -not [bool](Get-Service -Name $Name -ErrorAction SilentlyContinue)
+}
+
+function Wait-TailscaledProcessesAbsent([int]$TimeoutSec = 15) {
+  $sw = [Diagnostics.Stopwatch]::StartNew()
+  while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
+    if (-not (Get-Process -Name 'tailscaled' -ErrorAction SilentlyContinue)) { return $true }
+    Start-Sleep -Milliseconds 200
+  }
+  return -not [bool](Get-Process -Name 'tailscaled' -ErrorAction SilentlyContinue)
 }
 
 function Test-SamePath([string]$Left, [string]$Right) {
@@ -755,8 +835,8 @@ try {
     Write-Info 'Stopping Tailscale service...'
     if (-not (Stop-ServiceAndWait -Name 'Tailscale' -TimeoutSec 60)) { throw 'Tailscale service did not stop within 60 seconds' }
   }
-  if (Get-Process -Name 'tailscaled' -ErrorAction SilentlyContinue) {
-    throw 'tailscaled.exe is still running after the managed service stopped; refusing to kill an unrecoverable process'
+  if (-not (Wait-TailscaledProcessesAbsent -TimeoutSec 15)) {
+    throw 'tailscaled.exe is still running 15 seconds after the managed service stopped; refusing to overwrite a live daemon'
   }
   Get-Process -Name 'tailscale','tailscale-ipn' -ErrorAction SilentlyContinue |
     Stop-Process -Force -ErrorAction SilentlyContinue
@@ -896,7 +976,7 @@ try {
       }
     }
 
-    if ($serviceSafeForFiles -and (Get-Process -Name 'tailscaled' -ErrorAction SilentlyContinue)) {
+    if ($serviceSafeForFiles -and -not (Wait-TailscaledProcessesAbsent -TimeoutSec 15)) {
       Write-Err 'A tailscaled.exe process is still running; binary restoration was skipped to avoid overwriting a live executable'
       $rollbackFailed = $true
       $serviceSafeForFiles = $false
