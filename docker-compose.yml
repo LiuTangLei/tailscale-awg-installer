@@ -12,9 +12,12 @@ services:
     tty: true
     volumes:
       - ./tailscale-state:/var/lib/tailscale
+    # Keep the image's containerboot command: it interprets TS_* variables.
+    # v1.102.4+ preserves AWG when containerboot re-runs tailscale up.
     environment:
-      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
-    command: >
-      tailscaled
-      --state=/var/lib/tailscale/tailscaled.state
-      --socket=/var/run/tailscale/tailscaled.sock
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SOCKET: /var/run/tailscale/tailscaled.sock
+      TS_USERSPACE: "false"
+      TS_AUTH_ONCE: "true"
+      # TS_AUTHKEY: ${TS_AUTHKEY}
+      # TS_EXTRA_ARGS: --login-server=https://your-headscale-domain --accept-routes
