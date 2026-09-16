@@ -1,12 +1,12 @@
-# Tailscale with AmneziaWG and QUIC / HTTP/3
+# Tailscale with AmneziaWG and QUIC
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
 [![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android%20|%20iOS-blue)](#platform-support)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](LICENSE)
 
-This project installs a Tailscale fork with optional AmneziaWG or QUIC / HTTP/3 transport while retaining the official Tailscale and Headscale control-plane behavior. The default remains native WireGuard; in native mode, disabling every AWG field restores standard WireGuard behavior. Upgrading does not automatically switch an existing node to HTTP/3.
+This project installs a Tailscale fork with optional AmneziaWG or QUIC with built-in obfuscation while retaining the official Tailscale and Headscale control-plane behavior. The default remains native WireGuard; in native mode, disabling every AWG field restores standard WireGuard behavior. Upgrading does not automatically switch an existing node to QUIC.
 
-**Latest integrated release: [v1.102.4](https://github.com/LiuTangLei/tailscale/releases/tag/v1.102.4).** It merges upstream Tailscale 1.102.4 and the current H3 native-IP implementation, with the published QUIC dependency pinned to `v0.62.0-tailscale.4`. HTTP/3 is an explicit opt-in; mobile/router releases are separate and must not be assumed to include it.
+**Latest integrated release: [v1.102.4-r1](https://github.com/LiuTangLei/tailscale/releases/tag/v1.102.4-r1).** This fork revision keeps the upstream 1.102.4 base and adds unified AWG / QUIC selection. Upgrade the CLI and daemon together. QUIC uses the built-in HTTP/3 obfuscation; it is one user-facing option, not a separate H3 choice. Mobile/router releases remain separate.
 
 Release `v1.102.2` and newer support both profiles:
 
@@ -38,16 +38,16 @@ To install a specific published release:
 
 ```bash
 # Linux
-curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --version v1.102.4
+curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --version v1.102.4-r1
 
 # macOS
-curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash -s -- --version v1.102.4
+curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash -s -- --version v1.102.4-r1
 ```
 
 ```powershell
 # Windows, in an Administrator PowerShell
 $code = (iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1).Content
-& ([scriptblock]::Create($code)) -Version v1.102.4
+& ([scriptblock]::Create($code)) -Version v1.102.4-r1
 ```
 
 The Windows installer can run while the normal Tailscale service is active. It validates the service-owned process tree, then stops and restarts the service during the transactional update. Only an independent `tailscaled.exe` outside that process tree must be stopped manually.
@@ -72,10 +72,13 @@ Generate a profile:
 tailscale awg set
 ```
 
-On `v1.102.2+`, the interactive generator offers:
+On `v1.102.4-r1+`, the interactive setup offers:
 
-1. **AWG v3** — recommended and selected when you press Enter.
-2. **AWG v2** — select `2` for older peers and mobile/router clients that do not yet contain a v3-capable core.
+1. **AWG v3** — recommended AWG profile and selected when you press Enter.
+2. **AWG v2** — select `2` for older compatible peers.
+3. **QUIC** — select `3` for built-in obfuscation and automatic AWG clearing.
+
+Selecting AWG or confirming `tailscale awg sync` while QUIC is active automatically saves native mode with the chosen AWG profile. Restart once to activate it; no separate `transport native`, restart, then repeat-set sequence is needed.
 
 The generated JSON is shown before it is applied. Keep that JSON as the source of truth. Apply it to the other participating nodes, or run `tailscale awg sync` from a compatible online peer.
 
@@ -86,19 +89,18 @@ tailscale awg sync
 tailscale awg reset
 ```
 
-## QUIC / HTTP/3 transport (v1.102.4+)
+## QUIC transport and switching (v1.102.4-r1+)
 
 HTTP/3 carries IP packets directly over authenticated QUIC DATAGRAMs; it is not WireGuard wrapped inside QUIC. It includes automatic node-key-based peer authentication, staged identity/profile management, bounded packet batching, direct authenticated receive delivery and shared receive-buffer improvements. These changes do not establish universal WireGuard throughput parity or make the traffic indistinguishable from a browser.
 
-Upgrade every participating node before switching. Transport selection is node-wide: an H3 node does not automatically fall back to native WG/AWG for an older peer. Existing AWG parameters must be explicitly reset before enabling H3; save your AWG JSON first. Do not change the transport of the only connection you use to administer a remote machine without another recovery path.
+Upgrade every participating node before switching. Transport selection is node-wide: a QUIC node does not automatically fall back to native WG/AWG for an older peer. Selecting QUIC automatically clears the saved AWG profile; saving its JSON first is useful for later restoration, but a manual reset is no longer required. Clearing AWG can interrupt existing native AWG links, so keep another administration path.
 
 ```bash
 tailscale awg status
-# Only when AWG is configured: save its output, then reset it.
+# Optional: keep a copy of the existing AWG profile.
 tailscale awg get
-tailscale awg reset
-# Stage HTTP/3 and automatic node-key trust for the next daemon start.
-tailscale awg transport --yes http3-ip
+# Select QUIC with built-in obfuscation and automatically clear AWG.
+tailscale awg set --yes quic
 # Restart the existing tailscaled service using your platform's service manager.
 tailscale awg status
 tailscale awg doctor
@@ -108,14 +110,16 @@ For Docker, replace each CLI invocation with `docker compose exec tailscaled tai
 
 An optional node-wide server declaration is staged with `tailscale awg server --yes on`. Only a non-server node dialing an authenticated declared server uses the Chromium-inspired H3 ClientHello; server-to-server and ordinary mesh connections retain standard TLS. It is not a full browser fingerprint clone and does not automatically open or change listening ports. Restart the daemon after changing the declaration.
 
-To return to native WG/AWG, run `tailscale awg transport --yes native` and restart the daemon. Native mode does not generate an AWG profile; reapply your saved profile when required. The older raw `quic-ip` setting remains accepted for existing experimental configurations, but new deployments should use `http3-ip`.
+To return to AWG, use `tailscale awg set` (select v2/v3 or pass your saved JSON) or confirm a profile with `tailscale awg sync`, then restart once. The profile is saved immediately, but the running QUIC connection remains QUIC until that restart. `tailscale awg reset` selects standard native WG when leaving QUIC. `transport --yes native` remains available for explicitly staging native without generating an AWG profile.
+
+For scripts, `tailscale awg set --yes quic` stages without restarting. The older `transport --yes http3-ip` command still selects the same obfuscated QUIC implementation. Internal/JSON mode names are unchanged for compatibility; human-readable status uses QUIC.
 
 ## Compatibility matrix
 
 | Local/peer profile | Requirement | Result |
 | --- | --- | --- |
 | Native mode, all AWG fields disabled | Any standard Tailscale/WireGuard peer | Standard WireGuard behavior |
-| HTTP/3 (`http3-ip`) | Compatible H3 builds on every communicating node; AWG disabled | Direct QUIC-IP transport; no automatic WG fallback |
+| QUIC | Compatible QUIC builds on every communicating node; AWG automatically cleared | Direct QUIC-IP transport; no automatic WG fallback |
 | Only `jc`/`jmin`/`jmax` or `i1`-`i5` | May differ per node | Extra pre-handshake junk; standard peers ignore it |
 | AWG v2 `s1`-`s4` and `h1`-`h4` | All communicating AWG peers use matching values | AWG v2 communication |
 | AWG v3 | Every communicating peer has a v3-capable core and matching shared fields | AWG v3 communication |
@@ -176,7 +180,7 @@ Upgrading the binary alone does not convert an active v2 profile into v3.
 
 ## Docker Compose
 
-The included [docker-compose.yml](docker-compose.yml) uses `ltlei/tailscale-awg:latest` and persists the complete state directory in `./tailscale-state`. Use `ltlei/tailscale-awg:v1.102.4` to pin this release.
+The included [docker-compose.yml](docker-compose.yml) uses `ltlei/tailscale-awg:latest` and persists the complete state directory in `./tailscale-state`. Use `ltlei/tailscale-awg:v1.102.4-r1` to pin the current revision. The older `v1.102.4` tag remains unchanged.
 
 **Upgrade the image and Compose configuration together.** Keep the image's `containerboot` command; do not override it with `command: tailscaled ...`. The wrapper interprets `TS_STATE_DIR`, `TS_SOCKET`, `TS_AUTHKEY`, `TS_EXTRA_ARGS`, `TS_USERSPACE` and other supported `TS_*` variables. The supplied configuration uses persistent state and kernel networking. `TS_AUTH_ONCE=true` preserves an authenticated node across restarts; later login/up options are not automatically reapplied by that mode.
 

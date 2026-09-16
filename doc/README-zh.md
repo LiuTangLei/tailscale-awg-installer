@@ -1,12 +1,12 @@
-# 支持 AmneziaWG 与 QUIC / HTTP/3 的 Tailscale
+# 支持 AmneziaWG 与 QUIC 的 Tailscale
 
 [![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
 [![Platform Support](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android%20|%20iOS-blue)](#平台支持)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](../LICENSE)
 
-本项目为 Tailscale 集成可选的 AmneziaWG 或 QUIC / HTTP/3 数据传输，同时保留官方 Tailscale 与 Headscale 的控制面兼容性。默认仍为原生 WireGuard；在 native 模式下关闭所有 AWG 参数，即恢复标准 WireGuard 行为。升级不会自动把现有节点切换到 HTTP/3。
+本项目为 Tailscale 集成可选的 AmneziaWG 或内置混淆的 QUIC，同时保留官方 Tailscale 与 Headscale 的控制面兼容性。默认仍为原生 WireGuard；在 native 模式下关闭所有 AWG 参数，即恢复标准 WireGuard 行为。升级不会自动把现有节点切换到 QUIC。
 
-**最新集成版：[v1.102.4](https://github.com/LiuTangLei/tailscale/releases/tag/v1.102.4)。** 已合并上游 Tailscale 1.102.4 及当前 H3 原生 IP 实现，QUIC 依赖固定为已发布的 `v0.62.0-tailscale.4`。HTTP/3 需要显式启用；移动端、路由器仍独立发布，不能默认认为已包含 H3。
+**最新集成版：[v1.102.4-r1](https://github.com/LiuTangLei/tailscale/releases/tag/v1.102.4-r1)。** 这是基于上游 1.102.4 的 fork 修订版，统一 AWG / QUIC 配置入口。请同时升级 CLI 与守护进程。QUIC 内置现有 HTTP/3 混淆，不再让用户另选 H3；移动端、路由器仍独立发布。
 
 从 `v1.102.2` 开始同时支持两种配置：
 
@@ -38,16 +38,16 @@ Linux 发行版升级 Tailscale 软件包、或 macOS 升级 Homebrew formula �
 
 ```bash
 # Linux
-curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --version v1.102.4
+curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --version v1.102.4-r1
 
 # macOS
-curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash -s -- --version v1.102.4
+curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash -s -- --version v1.102.4-r1
 ```
 
 ```powershell
 # Windows 管理员 PowerShell
 $code = (iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1).Content
-& ([scriptblock]::Create($code)) -Version v1.102.4
+& ([scriptblock]::Create($code)) -Version v1.102.4-r1
 ```
 
 macOS 安装器使用 CLI/utun 版本。检测到 App Store 或独立版 Tailscale.app 时，会先征得同意并暂存 App 以便回滚；迁移中由用户停用的 System/Network Extension 无法由脚本自动重新启用。
@@ -70,10 +70,13 @@ tailscale up --login-server https://你的域名
 tailscale awg set
 ```
 
-在 `v1.102.2+` 中，交互式生成器提供：
+在 `v1.102.4-r1+` 中，交互式配置提供：
 
-1. **AWG v3**：推荐选项，直接回车默认生成 v3。
-2. **AWG v2**：输入 `2`，用于尚未升级到 v3 核心的旧节点、移动端或路由器。
+1. **AWG v3**：推荐的 AWG 配置，直接回车默认生成 v3。
+2. **AWG v2**：输入 `2`，用于兼容旧节点。
+3. **QUIC**：输入 `3`，内置混淆并自动清除 AWG 参数。
+
+QUIC 运行期间选择 AWG，或在 `tailscale awg sync` 中确认对端配置，会自动保存 native 模式和所选 AWG 参数。重启一次即生效，不需要先手动切 native、重启、再重复设置。
 
 应用前会先显示完整 JSON。请把它作为配置源保存，再复制到其他参与通信的节点，或从兼容且在线的节点执行 `tailscale awg sync`。
 
@@ -84,19 +87,18 @@ tailscale awg sync
 tailscale awg reset
 ```
 
-## QUIC / HTTP/3 模式（v1.102.4+）
+## QUIC 模式与双向切换（v1.102.4-r1+）
 
 HTTP/3 模式直接通过经过身份认证的 QUIC DATAGRAM 承载 IP 包，不是把 WireGuard 再套进 QUIC。当前实现包含节点密钥自动认证、身份与配置持久化、有限批量发送、认证后的直接收包及接收缓冲复用。不能据此宣称所有线路都达到 WireGuard 速度，也不能宣称流量与真实浏览器完全一致。
 
-切换前应升级所有参与节点。模式按整个节点生效：H3 节点不会为了旧对端自动回退到原生 WG/AWG。已配置 AWG 时，先保存 JSON，再显式清除 AWG 参数。不要通过唯一的远程管理连接切换传输模式，应保留独立恢复通道。
+切换前应升级所有参与节点。模式按整个节点生效：QUIC 节点不会为了旧对端自动回退到原生 WG/AWG。选择 QUIC 会自动清除已保存的 AWG 参数；可事先备份 JSON 以便恢复，但不再要求手动 reset。清除参数可能中断已有 AWG 连接，因此应保留独立管理通道。
 
 ```bash
 tailscale awg status
-# 仅在已配置 AWG 时：先保存输出，再重置。
+# 可选：备份现有 AWG 配置。
 tailscale awg get
-tailscale awg reset
-# 为下次启动保存 HTTP/3 模式，并启用节点密钥自动信任。
-tailscale awg transport --yes http3-ip
+# 选择内置混淆的 QUIC，自动清除 AWG 参数。
+tailscale awg set --yes quic
 # 使用当前平台的服务管理器重启现有 tailscaled 服务。
 tailscale awg status
 tailscale awg doctor
@@ -106,14 +108,16 @@ Docker 中将命令改为 `docker compose exec tailscaled tailscale ...`，最�
 
 可选的节点级服务端声明：`tailscale awg server --yes on`。只有非服务端主动连接已认证的声明服务端时，才使用 Chromium 风格的 H3 ClientHello；服务端互联、普通 Mesh 保持标准 TLS。它不是完整浏览器指纹复制，不会自动开放或修改监听端口。修改声明后需要重启守护进程。
 
-恢复原生 WG/AWG：执行 `tailscale awg transport --yes native` 后重启。native 不会自动生成 AWG 配置，需要时重新应用之前保存的 JSON。旧实验配置中的原始 `quic-ip` 仍被接受，新部署推荐 `http3-ip`。
+切回 AWG：执行 `tailscale awg set` 选择 v2/v3、传入已保存的 JSON，或执行 `tailscale awg sync` 并确认对端配置，然后重启一次。参数立即保存，但重启前当前连接仍使用 QUIC。`tailscale awg reset` 在离开 QUIC 时会选择标准 native WG；`transport --yes native` 仍可用于只保存 native 模式而不生成 AWG 参数。
+
+脚本可使用 `tailscale awg set --yes quic`，该命令不自动重启。旧的 `transport --yes http3-ip` 仍指向同一套混淆 QUIC 实现。内部配置和 JSON 模式值保持兼容，人类可读状态统一显示 QUIC。
 
 ## 兼容矩阵
 
 | 本机/对端配置 | 要求 | 结果 |
 | --- | --- | --- |
 | native 模式，所有 AWG 参数关闭 | 任意标准 Tailscale/WireGuard 节点 | 标准 WireGuard 行为 |
-| HTTP/3（`http3-ip`） | 所有通信节点具备兼容的 H3 实现，AWG 关闭 | 原生 QUIC-IP 传输，不自动回退 WG |
+| QUIC | 所有通信节点具备兼容实现，AWG 自动清除 | 原生 QUIC-IP 传输，不自动回退 WG |
 | 仅 `jc`/`jmin`/`jmax` 或 `i1`-`i5` | 各节点可以不同 | 仅增加握手前垃圾包，标准节点会忽略 |
 | AWG v2 的 `s1`-`s4`、`h1`-`h4` | 通信节点使用一致值 | AWG v2 通信 |
 | AWG v3 | 所有通信节点都具备 v3 核心，并使用一致的共享字段 | AWG v3 通信 |
@@ -174,7 +178,7 @@ v3 生成器会创建新的范围和头部保护密钥。不要复制 README 中
 
 ## Docker Compose
 
-仓库中的 [docker-compose.yml](../docker-compose.yml) 使用 `ltlei/tailscale-awg:latest`，完整状态目录保存在 `./tailscale-state`。固定本次版本可使用 `ltlei/tailscale-awg:v1.102.4`。
+仓库中的 [docker-compose.yml](../docker-compose.yml) 使用 `ltlei/tailscale-awg:latest`，完整状态目录保存在 `./tailscale-state`。固定当前修订版可使用 `ltlei/tailscale-awg:v1.102.4-r1`。旧 `v1.102.4` 标签保持不变。
 
 **镜像和 Compose 配置应一起升级。** 保留镜像默认的 `containerboot`，不要用 `command: tailscaled ...` 覆盖入口。该入口负责解释 `TS_STATE_DIR`、`TS_SOCKET`、`TS_AUTHKEY`、`TS_EXTRA_ARGS`、`TS_USERSPACE` 等环境变量。示例使用持久化状态与内核网络模式；`TS_AUTH_ONCE=true` 会在已登录后保留节点状态，因此后续重启不会自动重新应用登录/up 参数。
 
