@@ -6,7 +6,7 @@
 
 This project installs a Tailscale fork with optional AmneziaWG or QUIC with built-in obfuscation while retaining the official Tailscale and Headscale control-plane behavior. The default remains native WireGuard; in native mode, disabling every AWG field restores standard WireGuard behavior. Upgrading does not automatically switch an existing node to QUIC.
 
-**Latest integrated release: [v1.102.4-r1](https://github.com/LiuTangLei/tailscale/releases/tag/v1.102.4-r1).** This fork revision keeps the upstream 1.102.4 base and adds unified AWG / QUIC selection. Upgrade the CLI and daemon together. QUIC uses the built-in HTTP/3 obfuscation; it is one user-facing option, not a separate H3 choice. Mobile/router releases remain separate.
+**Latest integrated release: [v1.102.4-r2](https://github.com/LiuTangLei/tailscale/releases/tag/v1.102.4-r2).** This fork revision keeps the upstream 1.102.4 base, retains unified AWG / QUIC selection, and fixes restricted-path QUIC handshakes and early-packet loss during simultaneous connections. Upgrade the CLI and daemon together. QUIC uses the built-in HTTP/3 obfuscation; it is one user-facing option, not a separate H3 choice. Mobile/router releases remain separate.
 
 Release `v1.102.2` and newer support both profiles:
 
@@ -38,16 +38,16 @@ To install a specific published release:
 
 ```bash
 # Linux
-curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --version v1.102.4-r1
+curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --version v1.102.4-r2
 
 # macOS
-curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash -s -- --version v1.102.4-r1
+curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash -s -- --version v1.102.4-r2
 ```
 
 ```powershell
 # Windows, in an Administrator PowerShell
 $code = (iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1).Content
-& ([scriptblock]::Create($code)) -Version v1.102.4-r1
+& ([scriptblock]::Create($code)) -Version v1.102.4-r2
 ```
 
 The Windows installer can run while the normal Tailscale service is active. It validates the service-owned process tree, then stops and restarts the service during the transactional update. Only an independent `tailscaled.exe` outside that process tree must be stopped manually.
@@ -113,6 +113,12 @@ An optional node-wide server declaration is staged with `tailscale awg server --
 To return to AWG, use `tailscale awg set` (select v2/v3 or pass your saved JSON) or confirm a profile with `tailscale awg sync`, then restart once. The profile is saved immediately, but the running QUIC connection remains QUIC until that restart. `tailscale awg reset` selects standard native WG when leaving QUIC. `transport --yes native` remains available for explicitly staging native without generating an AWG profile.
 
 For scripts, `tailscale awg set --yes quic` stages without restarting. The older `transport --yes http3-ip` command still selects the same obfuscated QUIC implementation. Internal/JSON mode names are unchanged for compatibility; human-readable status uses QUIC.
+
+### QUIC connectivity fixes in r2
+
+Managed QUIC now starts with 1200-byte UDP payloads rather than assuming the path accepts a 1400-byte Initial. This avoids an authenticated-handshake black hole on smaller-MTU paths; the inner IP MTU and large-packet fragmentation remain unchanged. When both peers connect simultaneously, one authenticated losing connection can drain briefly instead of dropping its early IP packets; the selected primary, peer authorization and restart semantics are unchanged.
+
+Forced-DERP and required-direct tests verify application bytes through simultaneous startup, idle recovery, rebind, and normal/abrupt peer restarts. These controlled tests are not a guarantee for every real NAT/relay or a new WireGuard throughput-parity claim. Upgrade both ends, and check `tailscale awg status`: a desired QUIC mode with `Pending restart: yes` is not an active QUIC connection. The ordinary version still starts with `1.102.4`; r2's long version includes `t98abfff62`.
 
 ## Compatibility matrix
 
@@ -180,7 +186,7 @@ Upgrading the binary alone does not convert an active v2 profile into v3.
 
 ## Docker Compose
 
-The included [docker-compose.yml](docker-compose.yml) uses `ltlei/tailscale-awg:latest` and persists the complete state directory in `./tailscale-state`. Use `ltlei/tailscale-awg:v1.102.4-r1` to pin the current revision. The older `v1.102.4` tag remains unchanged.
+The included [docker-compose.yml](docker-compose.yml) uses `ltlei/tailscale-awg:latest` and persists the complete state directory in `./tailscale-state`. Use `ltlei/tailscale-awg:v1.102.4-r2` to pin the current revision. The older `v1.102.4` and `v1.102.4-r1` tags remain unchanged.
 
 **Upgrade the image and Compose configuration together.** Keep the image's `containerboot` command; do not override it with `command: tailscaled ...`. The wrapper interprets `TS_STATE_DIR`, `TS_SOCKET`, `TS_AUTHKEY`, `TS_EXTRA_ARGS`, `TS_USERSPACE` and other supported `TS_*` variables. The supplied configuration uses persistent state and kernel networking. `TS_AUTH_ONCE=true` preserves an authenticated node across restarts; later login/up options are not automatically reapplied by that mode.
 
