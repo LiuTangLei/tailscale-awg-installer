@@ -56,27 +56,30 @@ The Windows installer can run while the normal Tailscale service is active. It v
 
 macOS uses CLI-only `tailscaled` with a utun interface. The installer asks before migrating an App Store/standalone Tailscale app and stages the App bundle for rollback; macOS cannot automatically re-enable a System/Network Extension that the user disabled during migration.
 
-## Mobile QUIC previews — 1.102.4
+## Mobile QUIC builds — 1.102.4
 
-[Android 1.102.4 preview](https://github.com/LiuTangLei/tailscale-android/releases/tag/v1.102.4)
+[Android 1.102.4 signed release](https://github.com/LiuTangLei/tailscale-android/releases/tag/v1.102.4)
 and [AwgScale iOS 1.102.4 preview](https://github.com/LiuTangLei/AwgScale/releases/tag/v1.102.4)
 use the same corrected core (`1f00235ed2ce`) as the desktop release. Each exposes
 one QUIC choice and activates changes by restarting its actual backend; the
 interface verifies the running mode instead of accepting a pending selection.
 
-**Android:** 52 unit tests and an isolated emulator's real VPN upload/download
-and QUIC/AWG switching tests passed. Downloads include a development-signed test
-APK and an unsigned optimized release APK. The original release-signing
-credentials are not configured; the test signer is different from v1.102.2 and
-cannot provide an in-place update. Do not uninstall a production installation
-to try the preview. A new production-signed update is still pending.
+**Android:** download `tailscale-release-signed.apk`, now signed with the
+original production certificate through the existing `make release-signed`
+workflow. An in-place upgrade from this fork's v1.102.2 was tested without
+clearing app data; the installed UID, first-install time and existing test data
+survived, and the release app launched. Each build variant passed 52 unit tests;
+the same source passed real VPN upload/download and QUIC/AWG switching tests.
+This is the stable Android release. Old development-signed/unsigned preview
+assets were superseded. Official Tailscale and differently signed builds are
+not covered by the in-place upgrade claim.
 
 **iOS:** an ad-hoc/TrollStore-oriented IPA (version 1.102.4, build 11) is available,
 with 97 simulator tests and device compilation passed. It is not Apple
 distribution-signed. Real-device system VPN/QUIC validation remains pending;
 installation still requires an appropriate signing/entitlement environment.
-These mobile releases are marked prerelease, without replacing the previous
-stable mobile releases.
+Only the iOS build remains a prerelease and does not replace its previous
+stable release. Android 1.102.4 is now production-signed and marked stable.
 
 ## Quick start
 
@@ -264,7 +267,7 @@ chmod +x /usr/bin/install.sh
 /usr/bin/install.sh
 ```
 
-OpenWrt, Android, and iOS are released separately. Android/iOS 1.102.4 QUIC previews are available as described above; this desktop/Docker release does not itself bundle them or publish a new router package. Check the actual client/core version before syncing a v3 profile; use v2 when any participating client is not yet v3-capable. Do not enable QUIC on a group containing clients without compatible QUIC support.
+OpenWrt, Android, and iOS are released separately. The signed Android release and iOS 1.102.4 QUIC preview are available as described above; this desktop/Docker release does not itself bundle them or publish a new router package. Check the actual client/core version before syncing a v3 profile; use v2 when any participating client is not yet v3-capable. Do not enable QUIC on a group containing clients without compatible QUIC support.
 
 ## Mirrors
 
