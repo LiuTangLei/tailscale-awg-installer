@@ -54,6 +54,16 @@ $code = (iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-in
 
 macOS 安装器使用 CLI/utun 版本。检测到 App Store 或独立版 Tailscale.app 时，会先征得同意并暂存 App 以便回滚；迁移中由用户停用的 System/Network Extension 无法由脚本自动重新启用。
 
+## 移动端 QUIC 预览版 — 1.102.4
+
+[Android 1.102.4 预览版](https://github.com/LiuTangLei/tailscale-android/releases/tag/v1.102.4)
+和 [AwgScale iOS 1.102.4 预览版](https://github.com/LiuTangLei/AwgScale/releases/tag/v1.102.4)
+已接入与桌面相同的修复内核（`1f00235ed2ce`）。两端均只有一个 QUIC 选项，选择后重建实际后端并核实运行模式，不把等待重启当作已启用。
+
+**Android：**52 项单元测试及隔离模拟器中的真实 VPN 上传/下载、QUIC/AWG 切换测试通过。提供开发签名测试 APK 和未签名优化 Release APK。当前环境没有配置原正式签名凭据，测试证书与 v1.102.2 不同，不能覆盖升级；不要卸载生产安装来试用。可覆盖升级的正式签名包仍待完成。
+
+**iOS：**提供 ad-hoc/TrollStore 侧载 IPA，版本 1.102.4、构建号 11；97 项模拟器测试和真机架构编译通过。它不是 Apple 分发签名包，真机系统 VPN/QUIC 验收仍待完成，安装需要相应签名及权限环境。两个移动端均标记为预发布，没有替换此前稳定版本。
+
 ## 快速开始
 
 使用普通控制面登录：
@@ -240,7 +250,7 @@ chmod +x /usr/bin/install.sh
 /usr/bin/install.sh
 ```
 
-OpenWrt、Android、iOS 独立发布。本次桌面/Docker 发布不包含新 APK、IPA 或路由器软件包。同步 v3 前必须检查实际客户端/核心版本；只要任一通信端尚不支持 v3，就继续使用 v2。包含不支持 H3 客户端的通信组不能直接切换到 H3。
+OpenWrt、Android、iOS 独立发布。Android/iOS 1.102.4 QUIC 预览包见上文；本次桌面/Docker 发布本身不捆绑这些包，也没有发布新的路由器包。同步 v3 前必须检查实际客户端/核心版本；只要任一通信端尚不支持 v3，就继续使用 v2。包含不支持 QUIC 客户端的通信组不能直接切换到 QUIC。
 
 ## 镜像
 
