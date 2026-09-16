@@ -8,7 +8,7 @@ This project installs a Tailscale fork with optional AmneziaWG or QUIC with buil
 
 **Latest integrated release: [v1.102.4](https://github.com/LiuTangLei/tailscale/releases/tag/v1.102.4), corrected and republished on 2026-09-17.** This release keeps the upstream 1.102.4 base, unifies AWG / QUIC selection, and fixes restricted-path QUIC handshakes and early-packet loss during simultaneous connections. Upgrade the CLI and daemon together. QUIC uses the built-in HTTP/3 obfuscation; it is one user-facing option, not a separate H3 choice. Mobile/router releases remain separate.
 
-**Already installed 1.102.4? Check the long version.** The corrected build is `1.102.4-71-t98abfff62`; the original `t63c1da827` and interim `te2474993a` builds are withdrawn. Rerun the installer below, or pull and recreate Docker containers, to replace an older same-name build. Existing installations already reporting `t98abfff62` contain the same fixes and need no reinstall. This release consolidates the former r2 binaries; r1/r2 are no longer separate binary download choices.
+**Already installed 1.102.4? Check the long version.** The current build is `1.102.4-73-t1f00235ed` and includes automatic verified activation. Earlier `t63c1da827`, `te2474993a` and `t98abfff62` builds do not contain the complete activation flow. Rerun the installer below, or pull and recreate Docker containers, to replace an older same-name build. The release name remains v1.102.4; r1/r2 are no longer separate binary download choices.
 
 Release `v1.102.2` and newer support both profiles:
 
@@ -80,7 +80,7 @@ In the corrected `v1.102.4` build, the interactive setup offers:
 2. **AWG v2** — select `2` for older compatible peers.
 3. **QUIC** — select `3` for built-in obfuscation and automatic AWG clearing.
 
-Selecting AWG or confirming `tailscale awg sync` while QUIC is active automatically saves native mode with the chosen AWG profile. Restart once to activate it; no separate `transport native`, restart, then repeat-set sequence is needed.
+Selecting AWG or confirming `tailscale awg sync` while QUIC is active saves native mode with the chosen AWG profile, automatically restarts the local service, and verifies activation. No separate `transport native`, restart, then repeat-set sequence or second restart confirmation is needed. Keep an independent administration connection: changing the transport briefly disconnects VPN traffic.
 
 The generated JSON is shown before it is applied. Keep that JSON as the source of truth. Apply it to the other participating nodes, or run `tailscale awg sync` from a compatible online peer.
 
@@ -103,24 +103,24 @@ tailscale awg status
 tailscale awg get
 # Select QUIC with built-in obfuscation and automatically clear AWG.
 tailscale awg set --yes quic
-# Restart the existing tailscaled service using your platform's service manager.
+# The command restarts the local service and checks that QUIC is active.
 tailscale awg status
 tailscale awg doctor
 ```
 
-For Docker, replace each CLI invocation with `docker compose exec tailscaled tailscale ...`, then apply the staged mode with `docker compose restart tailscaled`. Preserve the **whole state directory**, including the managed transport identity and profile, not just `tailscaled.state`.
+For Docker or an isolated daemon that cannot safely restart the host's service, explicitly stage with `docker compose exec tailscaled tailscale awg set --no-restart --yes quic`, then run `docker compose restart tailscaled`. Other configuration commands accept `--no-restart` for the same purpose. A custom socket must never restart an unrelated host daemon. Preserve the **whole state directory**, including the managed transport identity and profile, not just `tailscaled.state`.
 
-An optional node-wide server declaration is staged with `tailscale awg server --yes on`. Only a non-server node dialing an authenticated declared server uses the Chromium-inspired H3 ClientHello; server-to-server and ordinary mesh connections retain standard TLS. It is not a full browser fingerprint clone and does not automatically open or change listening ports. Restart the daemon after changing the declaration.
+An optional node-wide server declaration is staged with `tailscale awg server --yes on`. Only a non-server node dialing an authenticated declared server uses the Chromium-inspired H3 ClientHello; server-to-server and ordinary mesh connections retain standard TLS. It is not a full browser fingerprint clone and does not automatically open or change listening ports. The command restarts the local service when activation is required.
 
-To return to AWG, use `tailscale awg set` (select v2/v3 or pass your saved JSON) or confirm a profile with `tailscale awg sync`, then restart once. The profile is saved immediately, but the running QUIC connection remains QUIC until that restart. `tailscale awg reset` selects standard native WG when leaving QUIC. `transport --yes native` remains available for explicitly staging native without generating an AWG profile.
+To return to AWG, use `tailscale awg set` (select v2/v3 or pass your saved JSON) or confirm a profile with `tailscale awg sync`; service restart and activation checks run automatically. `tailscale awg reset` selects standard native WG when leaving QUIC. `transport --yes native` selects native without generating an AWG profile. Failed restart/activation is reported as an error, not as successfully applied.
 
-For scripts, `tailscale awg set --yes quic` stages without restarting. The older `transport --yes http3-ip` command still selects the same obfuscated QUIC implementation. Internal/JSON mode names are unchanged for compatibility; human-readable status uses QUIC.
+`tailscale awg set --yes quic` includes automatic activation. Scripts that intentionally defer activation must add `--no-restart`; that is the only staging-only choice. The older `transport --yes http3-ip` command selects and activates the same obfuscated QUIC implementation. Internal/JSON mode names are unchanged for compatibility; human-readable status uses QUIC.
 
 ### QUIC connectivity fixes
 
 Managed QUIC now starts with 1200-byte UDP payloads rather than assuming the path accepts a 1400-byte Initial. This avoids an authenticated-handshake black hole on smaller-MTU paths; the inner IP MTU and large-packet fragmentation remain unchanged. When both peers connect simultaneously, one authenticated losing connection can drain briefly instead of dropping its early IP packets; the selected primary, peer authorization and restart semantics are unchanged.
 
-Forced-DERP and required-direct tests verify application bytes through simultaneous startup, idle recovery, rebind, and normal/abrupt peer restarts. These controlled tests are not a guarantee for every real NAT/relay or a new WireGuard throughput-parity claim. Upgrade both ends, and check `tailscale awg status`: a desired QUIC mode with `Pending restart: yes` is not an active QUIC connection. The ordinary version still starts with `1.102.4`; the corrected build's long version includes `t98abfff62`.
+Forced-DERP and required-direct tests verify application bytes through simultaneous startup, idle recovery, rebind, and normal/abrupt peer restarts. These controlled tests are not a guarantee for every real NAT/relay or a new WireGuard throughput-parity claim. Upgrade both ends, and check `tailscale awg status`: a desired QUIC mode with `Pending restart: yes` is not an active QUIC connection. The ordinary version still starts with `1.102.4`; the current build's long version includes `t1f00235ed`.
 
 ## Compatibility matrix
 
@@ -182,7 +182,7 @@ Common CPS tags include:
 2. Run the installer. Existing login state and preferences are preserved where the platform installation model permits it.
 3. Decide whether to keep v2 or migrate the whole communicating group to v3.
 4. For v3, upgrade every participating node to a v3-capable build, generate one v3 profile, then distribute/sync it.
-5. Follow the restart prompt after `tailscale awg set` or `tailscale awg sync`; `v1.102.2` recommends restarting by default after either command.
+5. The current `tailscale awg set` and `tailscale awg sync` commands restart the local service when needed and verify activation after confirmation; use `--no-restart` only for deliberate staged changes.
 
 Upgrading the binary alone does not convert an active v2 profile into v3.
 

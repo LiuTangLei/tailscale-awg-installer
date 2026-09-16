@@ -8,7 +8,7 @@
 
 **最新集成版：[v1.102.4](https://github.com/LiuTangLei/tailscale/releases/tag/v1.102.4)，已于 2026-09-17 重新发布修复版。** 基于上游 1.102.4，统一 AWG / QUIC 配置入口，并修复受限路径握手失败、同时建连时首批数据被丢弃的问题。请同时升级 CLI 与守护进程。QUIC 内置现有 HTTP/3 混淆，不再让用户另选 H3；移动端、路由器仍独立发布。
 
-**已经装过 1.102.4，也要核对 long version。** 修复版为 `1.102.4-71-t98abfff62`；原 `t63c1da827` 和中间 `te2474993a` 构建已撤回。旧同名版本需重新运行下方安装器，Docker 需重新拉取并重建容器。已经显示 `t98abfff62` 的安装含有相同修复，无须重复升级。本次将此前 r2 的完整修复统一为 v1.102.4，不再提供 r1/r2 独立二进制下载入口。
+**已经装过 1.102.4，也要核对 long version。** 当前构建为 `1.102.4-73-t1f00235ed`，包含自动重启及生效验证。此前 `t63c1da827`、`te2474993a`、`t98abfff62` 都不包含完整的自动生效流程；需重新运行下方安装器，Docker 需重新拉取并重建容器。发布名继续统一为 v1.102.4，不再提供 r1/r2 独立二进制下载入口。
 
 从 `v1.102.2` 开始同时支持两种配置：
 
@@ -78,7 +78,7 @@ tailscale awg set
 2. **AWG v2**：输入 `2`，用于兼容旧节点。
 3. **QUIC**：输入 `3`，内置混淆并自动清除 AWG 参数。
 
-QUIC 运行期间选择 AWG，或在 `tailscale awg sync` 中确认对端配置，会自动保存 native 模式和所选 AWG 参数。重启一次即生效，不需要先手动切 native、重启、再重复设置。
+QUIC 运行期间选择 AWG，或在 `tailscale awg sync` 中确认对端配置，会保存 native 模式和所选 AWG 参数，自动重启本机服务并核实生效。不需要手动切 native、重启、再重复设置，也不再二次询问是否重启。切换会短暂中断 VPN 流量，请保留独立管理连接。
 
 应用前会先显示完整 JSON。请把它作为配置源保存，再复制到其他参与通信的节点，或从兼容且在线的节点执行 `tailscale awg sync`。
 
@@ -101,24 +101,24 @@ tailscale awg status
 tailscale awg get
 # 选择内置混淆的 QUIC，自动清除 AWG 参数。
 tailscale awg set --yes quic
-# 使用当前平台的服务管理器重启现有 tailscaled 服务。
+# 命令会自动重启本机服务，并检查 QUIC 是否实际生效。
 tailscale awg status
 tailscale awg doctor
 ```
 
-Docker 中将命令改为 `docker compose exec tailscaled tailscale ...`，最后执行 `docker compose restart tailscaled` 应用模式。务必持久化**整个状态目录**，包括传输身份和配置，不能只保留 `tailscaled.state`。
+Docker 或无法安全重启宿主服务的独立守护进程，应显式使用 `docker compose exec tailscaled tailscale awg set --no-restart --yes quic` 暂存，然后执行 `docker compose restart tailscaled`。其他配置命令同样支持 `--no-restart`。指定自定义 socket 时，不能误重启不相关的宿主服务。务必持久化**整个状态目录**，包括传输身份和配置，不能只保留 `tailscaled.state`。
 
-可选的节点级服务端声明：`tailscale awg server --yes on`。只有非服务端主动连接已认证的声明服务端时，才使用 Chromium 风格的 H3 ClientHello；服务端互联、普通 Mesh 保持标准 TLS。它不是完整浏览器指纹复制，不会自动开放或修改监听端口。修改声明后需要重启守护进程。
+可选的节点级服务端声明：`tailscale awg server --yes on`。只有非服务端主动连接已认证的声明服务端时，才使用 Chromium 风格的 H3 ClientHello；服务端互联、普通 Mesh 保持标准 TLS。它不是完整浏览器指纹复制，不会自动开放或修改监听端口。修改声明后，需要生效的改动由命令自动重启本机服务。
 
-切回 AWG：执行 `tailscale awg set` 选择 v2/v3、传入已保存的 JSON，或执行 `tailscale awg sync` 并确认对端配置，然后重启一次。参数立即保存，但重启前当前连接仍使用 QUIC。`tailscale awg reset` 在离开 QUIC 时会选择标准 native WG；`transport --yes native` 仍可用于只保存 native 模式而不生成 AWG 参数。
+切回 AWG：执行 `tailscale awg set` 选择 v2/v3、传入已保存的 JSON，或执行 `tailscale awg sync` 并确认对端配置；服务重启和生效检查自动完成。`tailscale awg reset` 在离开 QUIC 时会选择标准 native WG；`transport --yes native` 选择 native 而不生成 AWG 参数。重启或生效检查失败会明确报错，不会显示虚假的“已应用”。
 
-脚本可使用 `tailscale awg set --yes quic`，该命令不自动重启。旧的 `transport --yes http3-ip` 仍指向同一套混淆 QUIC 实现。内部配置和 JSON 模式值保持兼容，人类可读状态统一显示 QUIC。
+`tailscale awg set --yes quic` 包含自动生效步骤。只有确实需要延迟生效的脚本才添加 `--no-restart`，显式选择仅暂存。旧的 `transport --yes http3-ip` 同样会选择并启用这套混淆 QUIC。内部配置和 JSON 模式值保持兼容，人类可读状态统一显示 QUIC。
 
 ### QUIC 连通性修复
 
 托管 QUIC 改为使用 1200 字节的初始 UDP 载荷，不再假设路径一定能承载 1400 字节 Initial，避免小 MTU 路径上握手包被持续丢弃；内部 IP MTU 和大包分片机制不变。两端同时建连时，允许一条已认证但未选为主连接的会话短暂接收剩余数据，避免立即关闭而丢掉首包；主连接选择、对端认证和重启语义不变。
 
-已通过强制 DERP 和强制直连的应用数据校验，覆盖同时启动、空闲恢复、网络重绑及正常/异常重启。这些受控测试不等于所有真实 NAT/中继均完成长期验收，也不代表新的 WireGuard 速度对等结论。请升级通信两端，并检查 `tailscale awg status`：目标模式为 QUIC 但仍显示 `Pending restart: yes`，就还没有真正切换。普通版本仍以 `1.102.4` 开头；修复版的 long version 包含 `t98abfff62`。
+已通过强制 DERP 和强制直连的应用数据校验，覆盖同时启动、空闲恢复、网络重绑及正常/异常重启。这些受控测试不等于所有真实 NAT/中继均完成长期验收，也不代表新的 WireGuard 速度对等结论。请升级通信两端，并检查 `tailscale awg status`：目标模式为 QUIC 但仍显示 `Pending restart: yes`，就还没有真正切换。普通版本仍以 `1.102.4` 开头；当前构建的 long version 包含 `t1f00235ed`。
 
 ## 兼容矩阵
 
@@ -180,7 +180,7 @@ v3 生成器会创建新的范围和头部保护密钥。不要复制 README 中
 2. 运行安装器。平台安装方式允许的情况下，登录状态和偏好配置都会保留。
 3. 选择继续使用 v2，或让整组通信节点一起迁移到 v3。
 4. 使用 v3 时，先将所有参与节点升级到具备 v3 核心的版本，再生成一份 v3 配置并分发/同步。
-5. 执行 `tailscale awg set` 或 `tailscale awg sync` 后按提示重启；`v1.102.2` 在两种命令成功后都默认建议重启。
+5. 当前版本在确认 `tailscale awg set` 或 `tailscale awg sync` 后，会按需自动重启本机服务并检查生效；只有明确需要暂存时才添加 `--no-restart`。
 
 只升级二进制不会把当前生效的 v2 配置自动转换成 v3。
 
