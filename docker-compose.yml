@@ -2,11 +2,15 @@ services:
   tailscaled:
     image: ltlei/tailscale-awg:latest
     container_name: tailscaled
-    network_mode: "host"
-    privileged: true
     cap_add:
       - NET_ADMIN
-      - SYS_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    # Enable these only when advertising this TUN container as an exit node
+    # or subnet router; approve the advertised routes in the control plane.
+    # sysctls:
+    #   net.ipv4.ip_forward: "1"
+    #   net.ipv6.conf.all.forwarding: "1"
     restart: unless-stopped
     stdin_open: true
     tty: true

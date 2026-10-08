@@ -108,7 +108,7 @@ tailscale awg status
 tailscale awg doctor
 ```
 
-Docker 或无法安全重启宿主服务的独立守护进程，应显式使用 `docker compose exec tailscaled tailscale awg set --no-restart --yes quic` 暂存，然后执行 `docker compose restart tailscaled`。其他配置命令同样支持 `--no-restart`。指定自定义 socket 时，不能误重启不相关的宿主服务。务必持久化**整个状态目录**，包括传输身份和配置，不能只保留 `tailscaled.state`。
+使用支持 `--no-restart` 的 CLI（包括 v1.104.1）时，Docker 或无法安全重启宿主服务的独立守护进程，应显式使用 `docker compose exec tailscaled tailscale awg set --no-restart --yes quic` 暂存，然后执行 `docker compose restart tailscaled`。其他配置命令同样支持 `--no-restart`。指定自定义 socket 时，不能误重启不相关的宿主服务。务必持久化**整个状态目录**，包括传输身份和配置，不能只保留 `tailscaled.state`。旧的固定 `ltlei/tailscale-awg:v1.102.4` 镜像不支持 `--no-restart`，请按下文 Docker 版本说明操作。
 
 可选的节点级服务端声明：`tailscale awg server --yes on`。只有非服务端主动连接已认证的声明服务端时，才使用 Chromium 风格的 H3 ClientHello；服务端互联、普通 Mesh 保持标准 TLS。它不是完整浏览器指纹复制，不会自动开放或修改监听端口。修改声明后，需要生效的改动由命令自动重启本机服务。
 
@@ -182,9 +182,9 @@ v3 生成器会创建新的范围和头部保护密钥。不要复制 README 中
 
 ## Docker Compose
 
-仓库中的 [docker-compose.yml](../docker-compose.yml) 使用 `ltlei/tailscale-awg:latest`，完整状态目录保存在 `./tailscale-state`。更新时拉取镜像并重建容器。
+仓库中的 [docker-compose.yml](../docker-compose.yml) 使用 `ltlei/tailscale-awg:latest`，完整状态目录保存在 `./tailscale-state`。更新时拉取镜像并重建容器。**GitHub 二进制与 Docker 镜像独立发布。** 截至 2026-10-08，GitHub `v1.104.1` 已发布，但 Docker Hub 尚无 `ltlei/tailscale-awg:v1.104.1` 标签。远端 Docker `latest` 当前报告 `1.102.4-73-t1f00235ed`，已支持 `--no-restart`，不能只凭短版本号将它与较早的固定 `v1.102.4` 镜像等同。不要根据 GitHub 发布版本或本机缓存的 `latest` 推断镜像版本，应在拉取后检查容器内版本。
 
-**镜像和 Compose 配置应一起升级。** 保留镜像默认的 `containerboot`，不要用 `command: tailscaled ...` 覆盖入口。该入口负责解释 `TS_STATE_DIR`、`TS_SOCKET`、`TS_AUTHKEY`、`TS_EXTRA_ARGS`、`TS_USERSPACE` 等环境变量。示例使用持久化状态与内核网络模式；`TS_AUTH_ONCE=true` 会在已登录后保留节点状态，因此后续重启不会自动重新应用登录/up 参数。
+**镜像和 Compose 配置应一起升级。** 保留镜像默认的 `containerboot`，不要用 `command: tailscaled ...` 覆盖入口。该入口负责解释 `TS_STATE_DIR`、`TS_SOCKET`、`TS_AUTHKEY`、`TS_EXTRA_ARGS`、`TS_USERSPACE` 等环境变量。默认示例使用普通 bridge 网络、`/dev/net/tun` 和 `NET_ADMIN`，无需 `privileged`、`SYS_ADMIN` 或 host 网络。TUN 路由位于容器网络命名空间内，不会自动加入宿主机。`TS_AUTH_ONCE=true` 会在已登录后保留节点状态，因此后续重启不会自动重新应用登录/up 参数。
 
 需要首次无人值守登录时，通过私有部署环境设置 `TS_AUTHKEY`；Headscale 可另外设置 `TS_EXTRA_ARGS=--login-server=https://你的域名 --accept-routes`。不要把认证密钥提交到仓库。不设置认证密钥时，按下面的 CLI 流程完成登录。`up --reset` 会保留独立管理的 AWG 配置，需要关闭时显式执行 `tailscale awg reset`。
 
@@ -203,7 +203,6 @@ cp -a /var/lib/tailscale/. ./tailscale-state/
 docker compose pull
 docker compose up -d
 docker compose exec tailscaled tailscale up
-docker compose exec tailscaled tailscale awg set
 ```
 
 使用 Headscale 时，把登录命令改为 `docker compose exec tailscaled tailscale up --login-server https://你的域名`。
@@ -219,6 +218,65 @@ Compose 服务/容器名是 `tailscaled`，容器里的命令是 `tailscale`：
 ```bash
 docker exec -it tailscaled tailscale awg get
 ```
+
+### 权限与路由
+
+默认 TUN 示例只额外添加 `NET_ADMIN`，保留 Docker 默认能力。`cap_drop: [ALL]` 加 `NET_ADMIN` 也通过了当前内核上的测试，但部分旧内核或 legacy iptables 路径需要 `NET_RAW`，不能把更严格的能力集合当作所有环境通用的配置。
+
+用 TUN 容器提供出口节点或子网路由时，取消 Compose 中 IPv4/IPv6 forwarding `sysctls` 的注释，并声明所需路由，例如首次登录时设置 `TS_EXTRA_ARGS=--advertise-exit-node`。还需在 Tailscale 管理控制台或 Headscale 批准出口节点/路由。若节点已登录且 `TS_AUTH_ONCE=true`，应显式应用设置，例如执行 `docker compose exec tailscaled tailscale set --advertise-exit-node`；仅修改环境变量不会再次执行 `up`。
+
+只有确实需要守护进程管理宿主网络命名空间时，例如与宿主集成的网关，才选择 `network_mode: host`。普通 WG/AWG 直连不要求 host 网络。使用 host 网络时，在宿主配置转发，而不是设置容器网络 `sysctls`；不要仅为了 AWG 添加 `privileged` 或 `SYS_ADMIN`。
+
+### 无额外能力的 userspace 示例
+
+将以下内容保存为**独立的** `compose.userspace.yml`，不要叠加到 TUN 示例上：
+
+```yaml
+services:
+  tailscaled:
+    image: ltlei/tailscale-awg:latest
+    container_name: tailscaled
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    volumes:
+      - ./tailscale-state:/var/lib/tailscale
+    environment:
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SOCKET: /var/run/tailscale/tailscaled.sock
+      TS_USERSPACE: "true"
+      TS_AUTH_ONCE: "true"
+      TS_SOCKS5_SERVER: 0.0.0.0:1055
+      TS_OUTBOUND_HTTP_PROXY_LISTEN: 0.0.0.0:1056
+      # TS_AUTHKEY: ${TS_AUTHKEY}
+    ports:
+      - "127.0.0.1:1055:1055"
+      - "127.0.0.1:1056:1056"
+```
+
+使用 `docker compose -f compose.userspace.yml up -d` 启动，后续命令同样添加该 `-f` 参数。此模式不需要 TUN 设备或额外能力。应用通过发布到本机端口的 SOCKS5/HTTP 代理访问 tailnet，例如 `curl --proxy socks5h://127.0.0.1:1055 http://<peer>:<port>/`。Sidecar 可通过 `network_mode: service:tailscaled` 共享网络命名空间，并使用 `127.0.0.1` 上的这些代理；userspace 模式下，仅共享命名空间不会创建 TUN 路由，宿主 OS 也不会自动获得 tailnet 路由。
+
+### 按容器内 CLI 版本设置 AWG
+
+先执行 `docker compose exec tailscaled tailscale version` 和 `docker compose exec tailscaled tailscale awg set --help`。将 `<JSON>` 替换为通信组一致的 AWG 参数。
+
+当 **`awg set --help` 列出了 `--no-restart`** 时，先暂存参数，再从宿主重启容器。v1.104.1 和上述已核验的 Docker `latest` 均支持：
+
+```bash
+docker compose exec tailscaled tailscale awg set --no-restart '<JSON>'
+docker compose restart tailscaled
+```
+
+**较早的固定 `ltlei/tailscale-awg:v1.102.4` 镜像**（commit `63c1da827`）CLI 不支持 `--no-restart`，使用：
+
+```bash
+docker compose exec tailscaled tailscale awg set '<JSON>'
+docker compose restart tailscaled
+```
+
+保留镜像的 `containerboot`，持久化**整个状态目录**，包括 AWG/QUIC 配置和身份。不要通过替换入口来绕过配置保存问题。
+
+网络条件允许时，userspace 支持 AWG UDP 直连。已发布 v1.102.4 镜像与 v1.104.1 候选二进制均通过隔离环境中的 userspace/TUN 直连、强制 DERP、数据校验和重启保存测试。这不代表 v1.104.1 已修复用户现场的 DERP-only 广域网问题。此类问题应收集双方的 `tailscale version`、`tailscale netcheck`、`tailscale ping <peer>`、`tailscale ping --tsmp <peer>` 和 `tailscale awg validate`，检查参数一致性、UDP/NAT、透明代理及策略路由。仅 disco ping 成功不能证明加密数据通路正常。
 
 ## OpenWrt
 

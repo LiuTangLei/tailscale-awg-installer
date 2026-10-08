@@ -110,7 +110,7 @@ tailscale awg status
 tailscale awg doctor
 ```
 
-For Docker or an isolated daemon that cannot safely restart the host's service, explicitly stage with `docker compose exec tailscaled tailscale awg set --no-restart --yes quic`, then run `docker compose restart tailscaled`. Other configuration commands accept `--no-restart` for the same purpose. A custom socket must never restart an unrelated host daemon. Preserve the **whole state directory**, including the managed transport identity and profile, not just `tailscaled.state`.
+With a CLI supporting `--no-restart` (including v1.104.1), for Docker or an isolated daemon that cannot safely restart the host's service, explicitly stage with `docker compose exec tailscaled tailscale awg set --no-restart --yes quic`, then run `docker compose restart tailscaled`. Other configuration commands accept `--no-restart` for the same purpose. A custom socket must never restart an unrelated host daemon. Preserve the **whole state directory**, including the managed transport identity and profile, not just `tailscaled.state`. The older fixed `ltlei/tailscale-awg:v1.102.4` image does not accept `--no-restart`; see the version-specific Docker instructions below.
 
 An optional node-wide server declaration is staged with `tailscale awg server --yes on`. Only a non-server node dialing an authenticated declared server uses the Chromium-inspired H3 ClientHello; server-to-server and ordinary mesh connections retain standard TLS. It is not a full browser fingerprint clone and does not automatically open or change listening ports. The command restarts the local service when activation is required.
 
@@ -184,9 +184,9 @@ Upgrading the binary alone does not convert an active v2 profile into v3.
 
 ## Docker Compose
 
-The included [docker-compose.yml](docker-compose.yml) uses `ltlei/tailscale-awg:latest` and persists the complete state directory in `./tailscale-state`. To update, pull the image and recreate the container.
+The included [docker-compose.yml](docker-compose.yml) uses `ltlei/tailscale-awg:latest` and persists the complete state directory in `./tailscale-state`. To update, pull the image and recreate the container. **GitHub binaries and Docker images are released separately.** As of 2026-10-08, the GitHub `v1.104.1` release is available but the Docker Hub `ltlei/tailscale-awg:v1.104.1` tag does not exist. The remote Docker `latest` currently reports `1.102.4-73-t1f00235ed` and already supports `--no-restart`; its short version is not enough to distinguish it from the older fixed `v1.102.4` image. Do not infer the Docker version from the GitHub release or a locally cached `latest` image; check the container after pulling.
 
-**Upgrade the image and Compose configuration together.** Keep the image's `containerboot` command; do not override it with `command: tailscaled ...`. The wrapper interprets `TS_STATE_DIR`, `TS_SOCKET`, `TS_AUTHKEY`, `TS_EXTRA_ARGS`, `TS_USERSPACE` and other supported `TS_*` variables. The supplied configuration uses persistent state and kernel networking. `TS_AUTH_ONCE=true` preserves an authenticated node across restarts; later login/up options are not automatically reapplied by that mode.
+**Upgrade the image and Compose configuration together.** Keep the image's `containerboot` command; do not override it with `command: tailscaled ...`. The wrapper interprets `TS_STATE_DIR`, `TS_SOCKET`, `TS_AUTHKEY`, `TS_EXTRA_ARGS`, `TS_USERSPACE` and other supported `TS_*` variables. The supplied configuration uses ordinary bridge networking, `/dev/net/tun` and `NET_ADMIN`, without `privileged`, `SYS_ADMIN` or host networking. TUN routes exist inside the container network namespace; they are not automatically installed on the host. `TS_AUTH_ONCE=true` preserves an authenticated node across restarts; later login/up options are not automatically reapplied by that mode.
 
 For unattended initial login, set `TS_AUTHKEY` via your private deployment environment and, for Headscale, `TS_EXTRA_ARGS=--login-server=https://your-headscale-domain --accept-routes`. Never commit an auth key. Without an auth key, complete login using the CLI below. `up --reset` preserves the separately managed AWG profile; use `tailscale awg reset` to disable it explicitly.
 
@@ -205,7 +205,6 @@ cp -a /var/lib/tailscale/. ./tailscale-state/
 docker compose pull
 docker compose up -d
 docker compose exec tailscaled tailscale up
-docker compose exec tailscaled tailscale awg set
 ```
 
 For Headscale, replace the login command with `docker compose exec tailscaled tailscale up --login-server https://your-headscale-domain`.
@@ -221,6 +220,65 @@ The Compose service/container is named `tailscaled`; the CLI binary inside it is
 ```bash
 docker exec -it tailscaled tailscale awg get
 ```
+
+### Permissions and routing
+
+The default TUN example adds only `NET_ADMIN` and retains Docker's default capabilities. `cap_drop: [ALL]` plus `NET_ADMIN` also passed our current-kernel test, but some older kernels/legacy iptables paths need `NET_RAW`; do not assume the stricter capability set works everywhere.
+
+For a TUN exit node or subnet router, uncomment the IPv4/IPv6 forwarding `sysctls` in the Compose file and advertise the intended routes, for example `TS_EXTRA_ARGS=--advertise-exit-node` on initial login. Approve the exit node/routes in Tailscale's admin console or Headscale. With `TS_AUTH_ONCE=true` and an already authenticated node, explicitly apply the desired settings, such as `docker compose exec tailscaled tailscale set --advertise-exit-node`; changing the environment alone will not re-run `up`.
+
+Use `network_mode: host` only when you intentionally need the daemon to manage the host network namespace, such as a host-integrated gateway. It is not required for ordinary direct WG/AWG traffic. With host networking, configure forwarding on the host rather than setting container-network `sysctls`, and do not add `privileged` or `SYS_ADMIN` merely for AWG.
+
+### Userspace without extra capabilities
+
+Save this as a **standalone** `compose.userspace.yml` instead of merging it over the TUN example:
+
+```yaml
+services:
+  tailscaled:
+    image: ltlei/tailscale-awg:latest
+    container_name: tailscaled
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    volumes:
+      - ./tailscale-state:/var/lib/tailscale
+    environment:
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SOCKET: /var/run/tailscale/tailscaled.sock
+      TS_USERSPACE: "true"
+      TS_AUTH_ONCE: "true"
+      TS_SOCKS5_SERVER: 0.0.0.0:1055
+      TS_OUTBOUND_HTTP_PROXY_LISTEN: 0.0.0.0:1056
+      # TS_AUTHKEY: ${TS_AUTHKEY}
+    ports:
+      - "127.0.0.1:1055:1055"
+      - "127.0.0.1:1056:1056"
+```
+
+Start with `docker compose -f compose.userspace.yml up -d`; use the same `-f` option for subsequent commands. This mode needs no TUN device or added capability. Applications access the tailnet through SOCKS5/HTTP proxies on the published localhost ports, for example `curl --proxy socks5h://127.0.0.1:1055 http://<peer>:<port>/`. A sidecar can share `network_mode: service:tailscaled` and use these proxies at `127.0.0.1`; sharing the namespace alone does not create TUN routes in userspace mode. The host OS does not automatically gain tailnet routes.
+
+### Apply AWG parameters with the installed CLI
+
+Run `docker compose exec tailscaled tailscale version` and `docker compose exec tailscaled tailscale awg set --help` first. Replace `<JSON>` with your group's matching AWG parameters.
+
+When **`awg set --help` lists `--no-restart`**, stage the configuration and then restart from the host. This includes v1.104.1 and the Docker `latest` verified above:
+
+```bash
+docker compose exec tailscaled tailscale awg set --no-restart '<JSON>'
+docker compose restart tailscaled
+```
+
+For the **older fixed `ltlei/tailscale-awg:v1.102.4` image** (commit `63c1da827`), whose CLI does not support `--no-restart`:
+
+```bash
+docker compose exec tailscaled tailscale awg set '<JSON>'
+docker compose restart tailscaled
+```
+
+Keep the image's `containerboot` and persist the **whole state directory**, including AWG/QUIC profiles and identities. Do not replace the entrypoint to work around configuration persistence.
+
+Userspace supports direct AWG UDP when the network permits it. Both the published v1.102.4 image and v1.104.1 candidate binaries passed isolated userspace/TUN direct and forced-DERP tests with payload verification and restart persistence. This does not establish that v1.104.1 fixes a reporter's DERP-only WAN path. For that case, collect both peers' `tailscale version`, `tailscale netcheck`, `tailscale ping <peer>`, `tailscale ping --tsmp <peer>` and `tailscale awg validate`; check matching parameters, UDP/NAT, transparent proxies and policy routing. A disco ping alone does not verify the encrypted data path.
 
 ## OpenWrt
 
