@@ -182,7 +182,7 @@ v3 生成器会创建新的范围和头部保护密钥。不要复制 README 中
 
 ## Docker Compose
 
-仓库中的 [docker-compose.yml](../docker-compose.yml) 使用 `ltlei/tailscale-awg:latest`，完整状态目录保存在 `./tailscale-state`。更新时拉取镜像并重建容器。**GitHub 二进制与 Docker 镜像独立发布。** 截至 2026-10-08，GitHub `v1.104.1` 已发布，但 Docker Hub 尚无 `ltlei/tailscale-awg:v1.104.1` 标签。远端 Docker `latest` 当前报告 `1.102.4-73-t1f00235ed`，已支持 `--no-restart`，不能只凭短版本号将它与较早的固定 `v1.102.4` 镜像等同。不要根据 GitHub 发布版本或本机缓存的 `latest` 推断镜像版本，应在拉取后检查容器内版本。
+仓库中的 [docker-compose.yml](../docker-compose.yml) 使用 `ltlei/tailscale-awg:latest`，完整状态目录保存在 `./tailscale-state`。更新时拉取镜像并重建容器。**GitHub 二进制与 Docker 镜像独立发布。** 截至 2026-10-08，Docker Hub `ltlei/tailscale-awg:v1.104.1` 和 `latest` 均已发布并核验，覆盖 Linux amd64、arm64、arm/v7、386 四种架构。CLI 报告 `1.104.1-131-t411ee6685`，支持 `--no-restart`。较早的固定 `v1.102.4` 镜像保持不变，不支持该参数。不要根据 GitHub 发布版本或本机缓存的 `latest` 推断镜像版本，应在拉取后检查容器内版本。
 
 **镜像和 Compose 配置应一起升级。** 保留镜像默认的 `containerboot`，不要用 `command: tailscaled ...` 覆盖入口。该入口负责解释 `TS_STATE_DIR`、`TS_SOCKET`、`TS_AUTHKEY`、`TS_EXTRA_ARGS`、`TS_USERSPACE` 等环境变量。默认示例使用普通 bridge 网络、`/dev/net/tun` 和 `NET_ADMIN`，无需 `privileged`、`SYS_ADMIN` 或 host 网络。TUN 路由位于容器网络命名空间内，不会自动加入宿主机。`TS_AUTH_ONCE=true` 会在已登录后保留节点状态，因此后续重启不会自动重新应用登录/up 参数。
 
@@ -276,7 +276,7 @@ docker compose restart tailscaled
 
 保留镜像的 `containerboot`，持久化**整个状态目录**，包括 AWG/QUIC 配置和身份。不要通过替换入口来绕过配置保存问题。
 
-网络条件允许时，userspace 支持 AWG UDP 直连。已发布 v1.102.4 镜像与 v1.104.1 候选二进制均通过隔离环境中的 userspace/TUN 直连、强制 DERP、数据校验和重启保存测试。这不代表 v1.104.1 已修复用户现场的 DERP-only 广域网问题。此类问题应收集双方的 `tailscale version`、`tailscale netcheck`、`tailscale ping <peer>`、`tailscale ping --tsmp <peer>` 和 `tailscale awg validate`，检查参数一致性、UDP/NAT、透明代理及策略路由。仅 disco ping 成功不能证明加密数据通路正常。
+网络条件允许时，userspace 支持 AWG UDP 直连。已发布 v1.102.4 镜像与本次发布的 v1.104.1 arm64 镜像均通过隔离环境中的 userspace/TUN 直连、强制 DERP、数据校验和重启保存测试。v1.104.1 四种架构镜像均已从 Docker Hub 回拉，核对可执行版本、公开依赖与 containerboot 启动命令。这不代表 v1.104.1 已修复用户现场的 DERP-only 广域网问题。此类问题应收集双方的 `tailscale version`、`tailscale netcheck`、`tailscale ping <peer>`、`tailscale ping --tsmp <peer>` 和 `tailscale awg validate`，检查参数一致性、UDP/NAT、透明代理及策略路由。仅 disco ping 成功不能证明加密数据通路正常。
 
 ## OpenWrt
 
