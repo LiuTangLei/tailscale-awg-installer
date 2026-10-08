@@ -1,0 +1,20 @@
+services:
+  tailscaled:
+    image: ltlei/tailscale-awg:latest
+    container_name: tailscaled
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    volumes:
+      - ./tailscale-state:/var/lib/tailscale
+    environment:
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SOCKET: /var/run/tailscale/tailscaled.sock
+      TS_USERSPACE: "true"
+      TS_AUTH_ONCE: "true"
+      TS_SOCKS5_SERVER: 0.0.0.0:1055
+      TS_OUTBOUND_HTTP_PROXY_LISTEN: 0.0.0.0:1056
+      # TS_AUTHKEY: ${TS_AUTHKEY}
+    ports:
+      - "127.0.0.1:1055:1055"
+      - "127.0.0.1:1056:1056"
