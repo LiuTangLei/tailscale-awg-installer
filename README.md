@@ -72,6 +72,8 @@ For AWG, replace `--yes quic` with `'<JSON>'`. Upgrade old images before using `
 
 ## Troubleshooting
 
+For Linux multi-WAN physical egress selection, see [outbound-interface policy routing](doc/outbound-interface.md).
+
 Check `tailscale version`, `tailscale netcheck`, `tailscale awg doctor` and `tailscale ping --tsmp <peer>`. A default disco ping alone does not prove application traffic works. Report both peers' versions and diagnostics in [Issues](https://github.com/LiuTangLei/tailscale-awg-installer/issues).
 
 [BSD 3-Clause License](LICENSE) · [Tailscale](https://github.com/tailscale/tailscale) · [AmneziaWG](https://github.com/amnezia-vpn/amneziawg-go)

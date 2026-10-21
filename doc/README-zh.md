@@ -72,6 +72,8 @@ AWG 将 `--yes quic` 替换为 `'<JSON>'`；旧镜像先升级再使用 `--no-re
 
 ## 排查
 
+Linux 多宽带指定物理出口，参见[网卡选择与策略路由](outbound-interface-zh.md)。
+
 检查 `tailscale version`、`tailscale netcheck`、`tailscale awg doctor`、`tailscale ping --tsmp <对端>`。默认 disco ping 成功不代表业务流量正常。反馈 [问题](https://github.com/LiuTangLei/tailscale-awg-installer/issues) 时附上双方版本和诊断结果。
 
 [BSD 3-Clause 许可证](../LICENSE) · [Tailscale](https://github.com/tailscale/tailscale) · [AmneziaWG](https://github.com/amnezia-vpn/amneziawg-go)
