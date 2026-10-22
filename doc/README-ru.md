@@ -1,254 +1,121 @@
-# Tailscale с AmneziaWG v2 и v3
+# Tailscale + AmneziaWG / QUIC
 
-[![GitHub Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale)](https://github.com/LiuTangLei/tailscale/releases/latest)
-[![Поддерживаемые платформы](https://img.shields.io/badge/platform-Linux%20|%20macOS%20|%20Windows%20|%20OpenWrt%20|%20Android%20|%20iOS-blue)](#поддержка-платформ)
-[![Лицензия](https://img.shields.io/badge/license-BSD--3--Clause-green)](../LICENSE)
+[English](../README.md) · [中文](README-zh.md) · [فارسی](README-fa.md) · [Релизы](https://github.com/LiuTangLei/tailscale/releases/latest)
 
-Этот проект устанавливает форк Tailscale с обфускацией AmneziaWG, сохраняя совместимость с официальным control plane Tailscale и Headscale. При отключенных AWG-параметрах он ведет себя как обычный Tailscale.
+Форк Tailscale с транспортами AmneziaWG и обфусцированным QUIC. Работает с официальным control plane Tailscale и с Headscale и ведёт себя как обычный Tailscale, пока вы не выберете другой транспорт.
 
-Начиная с `v1.102.2` поддерживаются два профиля: **AWG v3** (рекомендуется; защита заголовка, padding содержимого и случайные диапазоны таймингов) и **AWG v2** для совместимости со старыми узлами.
+[![Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=release)](https://github.com/LiuTangLei/tailscale/releases/latest) [![Docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=docker)](https://hub.docker.com/r/ltlei/tailscale-awg/tags)
 
-Языки: [English](../README.md) | [中文](README-zh.md) | [فارسی](README-fa.md) | [Русский](README-ru.md)
+Номера версий совпадают с upstream: форк `vX.Y.Z` основан на Tailscale `vX.Y.Z`.
 
-Архив старой версии AWG 1.5: [README-awg-v1.5.md](README-awg-v1.5.md).
+## Возможности
+
+- **Три транспорта на уровне узла**: стандартный WireGuard (по умолчанию), AWG v3 / v2 и QUIC.
+- **AWG v3**: защита заголовков, padding содержимого и случайные тайминги. AWG v2 оставлен для старых узлов.
+- **QUIC**: HTTP/3 поверх TLS с настроенным BBRv3. Узлы доверяют друг другу по ключу узла автоматически, синхронизировать параметры не нужно.
+- **Переподключение 0-RTT** между узлами v1.104.2+: одноразовые билеты и откат к полному рукопожатию. Совместимость с QUIC-узлами v1.104.1 сохранена.
+- **Устойчивость к переупорядочиванию**: QUIC-пакеты, пришедшие не по порядку, больше не отбрасываются как дубликаты.
+- **Роль сервера (опционально)**: после `tailscale awg server on` клиенты подключаются к этому узлу с TLS ClientHello в стиле Chromium.
+- **Переключение одной командой** с автоматическим перезапуском и диагностика `tailscale awg doctor`.
+- **Безопасное обновление**: установщики проверяют SHA-256, откатываются при ошибке и сохраняют текущий транспорт.
 
 ## Установка
 
-Установщики выбирают последний стабильный релиз. Если это допускает модель установки платформы, они сохраняют состояние CLI/службы и AWG-настройки, выполняют проверку миграции только для чтения и после установки показывают подсказку с учетом версии. Они не создают и не перезаписывают AWG-профиль автоматически. При переходе macOS с Tailscale.app на службу CLI/utun потребуется повторная авторизация, потому что эти модели установки не используют общее состояние.
+| Платформа | Установка / загрузка | Версия |
+| --- | --- | --- |
+| Linux | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh \| bash` | [![release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=)](https://github.com/LiuTangLei/tailscale/releases/latest) |
+| macOS | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash` | [![release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=)](https://github.com/LiuTangLei/tailscale/releases/latest) |
+| Windows (PowerShell от администратора) | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` | [![release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=)](https://github.com/LiuTangLei/tailscale/releases/latest) |
+| Docker | `ltlei/tailscale-awg:latest` ([см. ниже](#docker)) | [![docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=)](https://hub.docker.com/r/ltlei/tailscale-awg/tags) |
+| OpenWrt | [Установщик, пакеты и репозиторий](https://github.com/LiuTangLei/openwrt-tailscale-awg) | [![openwrt](https://img.shields.io/github/v/release/LiuTangLei/openwrt-tailscale-awg?label=)](https://github.com/LiuTangLei/openwrt-tailscale-awg/releases/latest) |
+| Android | [Подписанный APK](https://github.com/LiuTangLei/tailscale-android/releases/latest) | [![android](https://img.shields.io/github/v/release/LiuTangLei/tailscale-android?label=)](https://github.com/LiuTangLei/tailscale-android/releases/latest) |
+| iOS | [AwgScale IPA](https://github.com/LiuTangLei/AwgScale/releases/latest) | [![ios](https://img.shields.io/github/v/release/LiuTangLei/AwgScale?include_prereleases&label=)](https://github.com/LiuTangLei/AwgScale/releases) |
 
-| Платформа | Команда / действие |
-| --- | --- |
-| Linux | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh \| bash` |
-| macOS* | `curl -fsSL https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh \| bash` |
-| Windows | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` |
-| OpenWrt | См. [Установка OpenWrt](#установка-openwrt) |
-| Android | Загрузите APK из [releases](https://github.com/LiuTangLei/tailscale-android/releases) |
-| iOS | Экспериментальный [AwgScale](https://github.com/LiuTangLei/AwgScale); системный VPN требует TrollStore или подпись с Packet Tunnel entitlement |
+- Ручная установка для Linux, macOS, Windows, OpenWrt и мобильных устройств: [manual installation guide](manual-install.md) (на английском).
+- Установщики для ПК ставят последний релиз на x86_64 / ARM64. Чтобы закрепить версию, добавьте `--version <tag>` (Windows: `-Version <tag>`); на Linux / macOS `--uninstall` удаляет установку.
+- На macOS используется служба CLI/utun; при переходе с Tailscale.app нужно войти заново.
+- GUI для Windows должен совпадать с базовой версией Tailscale форка.
+- Для iOS нужен TrollStore или entitlement Packet Tunnel; IPA не подписан для App Store.
+- Обновление системным пакетным менеджером может вернуть официальные бинарники. Если команда `tailscale awg` пропала, запустите установщик снова.
 
-- macOS: установщик использует CLI-версию `tailscaled`. Если обнаружен официальный Tailscale.app, установщик запросит подтверждение и временно переместит App bundle для отката. Отключенное пользователем System/Network Extension нельзя включить обратно автоматически.
-- Мобильные клиенты Android и iOS поддерживают ручную настройку AWG и синхронизацию AWG-настроек с других узлов.
-- iOS: обычная подпись поддерживает app-only функции; системный VPN/AWG требует TrollStore или Packet Tunnel entitlement.
+## Зеркала GitHub
 
-![Пример синхронизации AWG на Android](sync1.jpg)
-
-## Docker Compose
-
-В репозитории есть `docker-compose.yml` для запуска `tailscaled` с поддержкой AWG.
-
-- Состояние хранится в каталоге `./tailscale-state` рядом с compose-файлом, поэтому состояние узла и параметры AWG сохраняются после перезапуска контейнера и перезагрузки хоста.
-- Если вы переходите со старого bind mount `/var/lib/tailscale:/var/lib/tailscale`, перед копированием остановите все процессы, использующие это состояние. Нельзя одновременно запускать host daemon и контейнер с одним состоянием узла:
+Если GitHub работает медленно или заблокирован, добавьте префикс зеркала к адресу скрипта и передайте тот же префикс установщику. Linux и macOS используют `--mirror`, Windows — `-MirrorPrefix` или переменную окружения `MIRROR_PREFIX`.
 
 ```bash
-docker compose down
-# Если host-служба использует тот же каталог, выберите подходящий init:
-# systemd: sudo systemctl stop tailscaled
-# OpenRC:  sudo rc-service tailscaled stop || sudo rc-service tailscale stop
-mkdir -p ./tailscale-state
-cp -a /var/lib/tailscale/. ./tailscale-state/
-# обновите docker-compose.yml
+# macOS: замените install-linux.sh на install-macos.sh
+curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh \
+  | bash -s -- --mirror https://ghfast.top
+```
+
+```powershell
+$m = 'https://ghfast.top'
+$code = (iwr -useb "$m/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1").Content
+& ([scriptblock]::Create($code)) -MirrorPrefix $m
+```
+
+| Зеркало | Примечание |
+| --- | --- |
+| `https://ghfast.top` | Используется по умолчанию в установщике OpenWrt |
+| `https://gh-proxy.org` | Используется установщиком OpenWrt |
+| `https://gh-proxy.com` | Проксирует и GitHub API |
+| Своё | Любой прокси формата `https://<зеркало>/https://github.com/...`, например собственный [gh-proxy](https://github.com/hunshcn/gh-proxy) на Cloudflare Workers или в Docker |
+
+- Установщик определяет последний релиз через `api.github.com` — сначала напрямую, затем через зеркало. Большинство зеркал не проксирует API; если запрос не удался, используйте `gh-proxy.com` или добавьте `--version <tag>` с версией из бейджа выше.
+- Публичные зеркала — сторонние сервисы, они могут измениться или перестать работать. Для важных машин используйте своё зеркало.
+- OpenWrt: установщик сам перебирает эти зеркала; для своего используйте `install.sh --custom-proxy`.
+
+## Подключение и настройка
+
+```bash
+tailscale up
+```
+
+Для Headscale: `tailscale up --login-server https://your-headscale-domain`.
+
+| Действие | Команда |
+| --- | --- |
+| Выбрать AWG v3 (по умолчанию), v2 или QUIC | `tailscale awg set` |
+| Включить QUIC | `tailscale awg set --yes quic` |
+| Показать / сохранить AWG JSON | `tailscale awg get` |
+| Применить сохранённый JSON | `tailscale awg set '<JSON>'` |
+| Скопировать профиль совместимого узла в сети | `tailscale awg sync` |
+| Объявить узел QUIC-сервером | `tailscale awg server on` |
+| Вернуться к стандартному WireGuard | `tailscale awg reset` |
+| Активный режим / диагностика | `tailscale awg status` / `tailscale awg doctor` |
+
+- У узлов AWG общие поля должны совпадать. Сгенерируйте профиль один раз, сохраните JSON и распространите его или используйте `sync`.
+- QUIC действует на весь узел, и его должны включить все взаимодействующие узлы. Автоматического отката на WireGuard нет. Включение QUIC очищает профиль AWG — сохраните JSON заранее, если он понадобится.
+- Смена транспорта перезапускает локальную службу и ненадолго прерывает VPN. Сохраните другой способ доступа к удалённым машинам.
+
+## Docker
+
+Используйте [docker-compose.yml](../docker-compose.yml) с образом `ltlei/tailscale-awg:latest` или `:v1.104` (следует за последним патч-релизом). Доступны amd64, arm64, arm/v7 и 386.
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/docker-compose.yml
 docker compose pull
 docker compose up -d
+docker compose exec tailscaled tailscale up
 ```
 
-Базовый сценарий:
+Для Headscale добавьте `--login-server https://your-headscale-domain`. Для входа без участия передавайте `TS_AUTHKEY` приватно и никогда не коммитьте его.
 
-1. Поднимите сервис: `docker compose up -d`
-2. Авторизуйтесь в контейнере: `docker compose exec tailscaled tailscale up`
-3. Выполняйте AWG-команды так же, например: `docker compose exec tailscaled tailscale awg sync`
-
-Перед выбором v3 проверьте `docker compose exec tailscaled tailscale version`: версия core должна быть не ниже `v1.102.2`.
-
-Если вы используете Headscale, добавьте к `tailscale up` параметр `--login-server https://your-headscale-domain`.
-
-Здесь легко перепутать два имени: сервис/контейнер Compose называется `tailscaled`, а CLI-команда внутри контейнера — `tailscale`. Поэтому прямой Docker-вариант выглядит так:
+Внутри контейнера сначала подготовьте смену транспорта, затем перезапустите контейнер:
 
 ```bash
-docker exec -it tailscaled tailscale status
+docker compose exec tailscaled tailscale awg set --no-restart --yes quic
+docker compose restart tailscaled
 ```
 
-`docker exec tailscale status` не то же самое: Docker будет искать контейнер с именем `tailscale`, а затем попытается запустить `status` как программу внутри него.
+Для AWG замените `--yes quic` на `'<JSON>'`.
 
-Чтобы запускать `tailscale ...` прямо на Linux-хосте, сохраните alias в файле запуска shell:
+- Сохраняйте команду образа `containerboot` и **весь** каталог `./tailscale-state`. Не используйте одно живое состояние узла в нескольких демонах.
+- Режиму TUN нужны `/dev/net/tun` и `NET_ADMIN`; маршруты действуют внутри контейнера. Exit node и subnet router дополнительно требуют форвардинга и одобрения в control plane. При `TS_AUTH_ONCE=true` последующие изменения маршрутов требуют явного `tailscale set`.
+- Без TUN и дополнительных прав используйте **только** [compose.userspace.yml](../compose.userspace.yml) (`docker compose -f compose.userspace.yml up -d` и тот же `-f` для остальных команд). Приложения должны работать через SOCKS5-прокси `1055` или HTTP-прокси `1056`.
 
-```bash
-printf "\nalias tailscale='docker exec -it tailscaled tailscale'\n" >> ~/.bashrc && . ~/.bashrc
-```
+## Диагностика
 
-Для Zsh используйте `~/.zshrc`:
+Проверьте `tailscale version`, `tailscale netcheck`, `tailscale awg doctor` и `tailscale ping --tsmp <peer>`. Успешный обычный `tailscale ping` ещё не означает, что трафик приложений проходит. В [issue](https://github.com/LiuTangLei/tailscale-awg-installer/issues) приложите версии и диагностику обоих узлов.
 
-```bash
-printf "\nalias tailscale='docker exec -it tailscaled tailscale'\n" >> ~/.zshrc && . ~/.zshrc
-```
-
-После этого можно запускать:
-
-```bash
-tailscale up
-tailscale awg get
-```
-
-## Установка OpenWrt
-
-Стандартная команда:
-
-```bash
-wget -O /usr/bin/install.sh https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install_en.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh
-```
-
-Для регионов с ограниченным доступом к GitHub:
-
-```bash
-wget -O /usr/bin/install.sh https://ghfast.top/https://raw.githubusercontent.com/LiuTangLei/openwrt-tailscale-awg/main/install.sh && chmod +x /usr/bin/install.sh && /usr/bin/install.sh
-```
-
-Скрипт основан на [GuNanOvO/openwrt-tailscale](https://github.com/GuNanOvO/openwrt-tailscale).
-
-## Зеркала
-
-Если GitHub работает медленно или недоступен, можно использовать собственное префиксное зеркало, например `https://your-mirror-site.com`:
-
-```bash
-# Linux
-curl -fsSL https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-linux.sh | bash -s -- --mirror https://your-mirror-site.com
-
-# macOS
-curl -fsSL https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-macos.sh | bash -s -- --mirror https://your-mirror-site.com
-```
-
-```powershell
-# Windows
-$scriptContent = (iwr -useb https://your-mirror-site.com/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1).Content; $scriptBlock = [scriptblock]::Create($scriptContent); & $scriptBlock -MirrorPrefix 'https://your-mirror-site.com/'
-```
-
-Если PowerShell блокирует выполнение, используйте `Set-ExecutionPolicy RemoteSigned` или `Bypass -Scope Process`.
-
-## Быстрый старт
-
-Подсказка: `tailscale amnezia-wg` равно `tailscale awg`.
-
-1. Войдите в сеть:
-
-```bash
-# Официальный control plane
-tailscale up
-
-# Headscale
-tailscale up --login-server https://your-headscale-domain
-```
-
-2. Настройте AWG:
-
-```bash
-tailscale awg set
-```
-
-В `v1.102.2+` нажмите Enter, чтобы сгенерировать рекомендуемый профиль AWG v3, либо введите `2`, чтобы создать совместимый профиль AWG v2.
-
-3. Синхронизируйте другие устройства:
-
-- CLI-платформы (Linux/macOS/Windows/OpenWrt): `tailscale awg sync`
-- Android и iOS (AwgScale): настройте AWG вручную в приложении или синхронизируйте настройки с другого узла
-
-После успешного `tailscale awg set` или `tailscale awg sync` следуйте запросу перезапуска; `v1.102.2` по умолчанию рекомендует перезапуск после обеих команд.
-
-4. Проверяйте или сбрасывайте настройки при необходимости:
-
-```bash
-tailscale awg get
-tailscale awg validate # v1.102.2+
-tailscale awg reset
-```
-
-## Готовые пресеты
-
-| Цель | Пример | Совместимость |
-| --- | --- | --- |
-| Базовый мусорный трафик | `tailscale awg set '{"jc":4,"jmin":64,"jmax":256}'` | Работает со стандартными узлами Tailscale |
-| Мусорный трафик + сигнатуры | `tailscale awg set '{"jc":2,"jmin":64,"jmax":128,"i1":"<b 0x40><r 12>"}'` | Работает со стандартными узлами Tailscale |
-| Маскировка рукопожатия | `tailscale awg set '{"s1":10,"s2":15,"s3":8,"s4":0}'` | Все AWG-узлы должны иметь одинаковые `s1`-`s4` |
-| Полная маскировка | `tailscale awg set '{"s1":10,"s2":15,"s3":8,"s4":0,"h1":{"min":100000,"max":200000},"h2":{"min":300000,"max":350000},"h3":{"min":400000,"max":450000},"h4":{"min":500000,"max":550000}}'` | Все AWG-узлы должны иметь одинаковые `s1`-`s4` и `h1`-`h4` |
-| Полная маскировка + сигнатуры | `tailscale awg set '{"s1":10,"s2":15,"s3":8,"s4":0,"h1":{"min":100000,"max":200000},"h2":{"min":300000,"max":350000},"h3":{"min":400000,"max":450000},"h4":{"min":500000,"max":550000},"i1":"<b 0xc0><r 32><t>"}'` | `i1`-`i5` могут отличаться, но `s1`-`s4` и `h1`-`h4` должны совпадать |
-
-## Справочник по параметрам
-
-- `jc`, `jmin`, `jmax`: количество и размер мусорных пакетов.
-- `i1`-`i5`: необязательная CPS-цепочка сигнатур.
-- `s1`-`s4`: поля префикса или padding в рукопожатии; должны совпадать у всех AWG-узлов.
-- `h1`-`h4`: диапазоны полей заголовков в виде `{"min": low, "max": high}`. Эффективные диапазоны не должны пересекаться, а общие значения должны совпадать у всех AWG-узлов.
-
-AWG v3 также добавляет `header_protection_key`, `content_padding_addition`, `rekey_after_time`, `rekey_timeout`, `reject_after_time`, `keepalive_timeout` и `max_handshake_attempts`. Ключ защиты заголовка и общие поля должны совпадать у взаимодействующих v3-узлов; локальные диапазоны padding и таймингов могут отличаться. Не включайте v3 только на одной стороне соединения.
-
-Слишком большие значения мусорного трафика и длинные сигнатурные цепочки увеличивают задержку и расход трафика.
-
-## Поддержка платформ
-
-| Платформа | Архитектура | Статус |
-| --- | --- | --- |
-| Linux | x86_64, ARM64 | ✅ Полная |
-| macOS | Intel, Apple Silicon | ✅ Полная |
-| Windows | x86_64, ARM64 | ✅ Установщик |
-| OpenWrt | Различные | Отдельный релиз; проверьте версию core |
-| Android | Universal APK (ARM64, ARM, x86_64, x86) | ✅ Ручная настройка AWG + sync |
-| iOS | iPhone/iPad (iOS 15+) | ✅ Экспериментальный клиент (ручная настройка AWG + sync) |
-
-OpenWrt, Android и iOS публикуются отдельно. Перед синхронизацией v3 проверьте фактическую версию клиента/ядра; если хотя бы один узел еще не поддерживает v3, используйте v2.
-
-## Дополнительно: сигнатуры протоколов
-
-Формат CPS:
-
-```text
-i{n} = <tag1><tag2>...<tagN>
-```
-
-Распространенные теги:
-
-- `<b 0xHEX>`: статические байты
-- `<r N>`: криптографически стойкие случайные байты
-- `<rc N>`: случайные ASCII-буквы
-- `<rd N>`: случайные десятичные цифры
-- `<t>`: timestamp
-
-Пример:
-
-```text
-i1 = <b 0xf6ab3267fa><b 0xf6ab><t><r 10>
-```
-
-> Совместимость: AmneziaWG удалил старый счетчик CPS `<c>` при переработке AWG 2 в `amneziawg-go v0.2.16`; этот fork унаследовал изменение в `v1.98.1`, поэтому удалите этот тег из старых значений `i1`-`i5`.
-
-## Устранение неполадок
-
-Проверьте установку:
-
-```bash
-tailscale version
-tailscale awg get
-tailscale awg validate # v1.102.2+
-```
-
-Если соединение ломается, сначала вернитесь к обычному WireGuard и попробуйте простой пресет:
-
-```bash
-tailscale awg reset
-tailscale awg set '{"jc":2,"jmin":64,"jmax":128}'
-sudo journalctl -u tailscaled -f
-```
-
-В Windows PowerShell удобнее использовать интерактивный режим:
-
-```powershell
-tailscale awg set
-```
-
-## Ссылки
-
-- Releases: <https://github.com/LiuTangLei/tailscale/releases>
-- Android APK: <https://github.com/LiuTangLei/tailscale-android/releases>
-- iOS клиент (AwgScale): <https://github.com/LiuTangLei/AwgScale>
-- Установщик (issues): <https://github.com/LiuTangLei/tailscale-awg-installer/issues>
-- Amnezia-WG docs: <https://docs.amnezia.org/documentation/instructions/new-amneziawg-selfhosted/#how-to-extract-a-protocol-signature-for-amneziawg-manually>
-
-## Лицензия
-
-BSD 3-Clause, как и у upstream Tailscale.
+[Лицензия BSD 3-Clause](../LICENSE) · [Tailscale](https://github.com/tailscale/tailscale) · [AmneziaWG](https://github.com/amnezia-vpn/amneziawg-go)
