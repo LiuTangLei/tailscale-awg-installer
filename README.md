@@ -2,6 +2,7 @@
 
 [中文](doc/README-zh.md) · [فارسی](doc/README-fa.md) · [Русский](doc/README-ru.md) · [Releases](https://github.com/LiuTangLei/tailscale/releases/latest)
 
+**Current release: v1.104.4** — desktop, Docker, OpenWrt, Android and AwgScale.
 A Tailscale fork with AmneziaWG and obfuscated QUIC transports. It works with the official Tailscale control plane and Headscale, and behaves like standard Tailscale until you choose another transport.
 
 [![Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=release)](https://github.com/LiuTangLei/tailscale/releases/latest) [![Docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=docker)](https://hub.docker.com/r/ltlei/tailscale-awg/tags)
@@ -29,7 +30,7 @@ Version numbers follow upstream: fork `vX.Y.Z` is based on Tailscale `vX.Y.Z`.
 | Docker | `ltlei/tailscale-awg:latest` ([see below](#docker)) | [![docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=)](https://hub.docker.com/r/ltlei/tailscale-awg/tags) |
 | OpenWrt | [Installer, packages and feed](https://github.com/LiuTangLei/openwrt-tailscale-awg) | [![openwrt](https://img.shields.io/github/v/release/LiuTangLei/openwrt-tailscale-awg?label=)](https://github.com/LiuTangLei/openwrt-tailscale-awg/releases/latest) |
 | Android | [Signed APK](https://github.com/LiuTangLei/tailscale-android/releases/latest) | [![android](https://img.shields.io/github/v/release/LiuTangLei/tailscale-android?label=)](https://github.com/LiuTangLei/tailscale-android/releases/latest) |
-| iOS | [AwgScale IPA](https://github.com/LiuTangLei/AwgScale/releases/latest) | [![ios](https://img.shields.io/github/v/release/LiuTangLei/AwgScale?include_prereleases&label=)](https://github.com/LiuTangLei/AwgScale/releases) |
+| iOS | [AwgScale IPA](https://github.com/LiuTangLei/AwgScale/releases/latest) | [![ios](https://img.shields.io/github/v/release/LiuTangLei/AwgScale?label=)](https://github.com/LiuTangLei/AwgScale/releases/latest) |
 
 - Prefer to install by hand? See the [manual installation guide](doc/manual-install.md) for Linux, macOS, Windows, OpenWrt and mobile.
 - Desktop installers install the latest release on x86_64 / ARM64. Add `--version <tag>` (Windows: `-Version <tag>`) to pin a release. On Linux / macOS, `--uninstall` removes it.

@@ -287,7 +287,7 @@ $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $tag  = (Invoke-RestMethod https://api.github.com/repos/LiuTangLei/tailscale/releases/latest).tag_name
 # If api.github.com is unreachable, set the tag from the release page by hand, for example:
-# $tag = 'v1.104.2'
+# $tag = 'v1.104.4'
 $ver  = $tag.TrimStart('v')
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
 $base = "https://github.com/LiuTangLei/tailscale/releases/download/$tag"

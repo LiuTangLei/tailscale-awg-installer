@@ -2,6 +2,7 @@
 
 [English](../README.md) · [فارسی](README-fa.md) · [Русский](README-ru.md) · [下载](https://github.com/LiuTangLei/tailscale/releases/latest)
 
+**Current release: v1.104.4** — desktop, Docker, OpenWrt, Android and AwgScale.
 带 AmneziaWG 与 QUIC 混淆传输的 Tailscale fork，兼容官方 Tailscale 控制端和 Headscale。在你切换传输之前，行为与标准 Tailscale 一致。
 
 [![Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=release)](https://github.com/LiuTangLei/tailscale/releases/latest) [![Docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=docker)](https://hub.docker.com/r/ltlei/tailscale-awg/tags)
@@ -29,7 +30,7 @@
 | Docker | `ltlei/tailscale-awg:latest`（[见下文](#docker)） | [![docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=)](https://hub.docker.com/r/ltlei/tailscale-awg/tags) |
 | OpenWrt | [安装器、软件包与软件源](https://github.com/LiuTangLei/openwrt-tailscale-awg) | [![openwrt](https://img.shields.io/github/v/release/LiuTangLei/openwrt-tailscale-awg?label=)](https://github.com/LiuTangLei/openwrt-tailscale-awg/releases/latest) |
 | Android | [签名 APK](https://github.com/LiuTangLei/tailscale-android/releases/latest) | [![android](https://img.shields.io/github/v/release/LiuTangLei/tailscale-android?label=)](https://github.com/LiuTangLei/tailscale-android/releases/latest) |
-| iOS | [AwgScale IPA](https://github.com/LiuTangLei/AwgScale/releases/latest) | [![ios](https://img.shields.io/github/v/release/LiuTangLei/AwgScale?include_prereleases&label=)](https://github.com/LiuTangLei/AwgScale/releases) |
+| iOS | [AwgScale IPA](https://github.com/LiuTangLei/AwgScale/releases/latest) | [![ios](https://img.shields.io/github/v/release/LiuTangLei/AwgScale?label=)](https://github.com/LiuTangLei/AwgScale/releases/latest) |
 
 - 需要手动安装？见 [手动安装教程](manual-install-zh.md)，涵盖 Linux、macOS、Windows、OpenWrt 和手机。
 - 桌面安装器默认安装最新版，支持 x86_64 / ARM64。指定版本加 `--version <tag>`（Windows 为 `-Version <tag>`）；Linux / macOS 卸载加 `--uninstall`。
