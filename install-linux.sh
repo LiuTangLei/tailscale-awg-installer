@@ -1756,7 +1756,7 @@ main() {
 Usage: $0 [OPTIONS]
 Options:
   --mirror PREFIX     Use GitHub mirror
-  --version TAG       Use specific GitHub release tag (e.g. v1.102.2)
+  --version TAG       Use specific GitHub release tag (e.g. v1.104.4)
   --pre-release      Install the latest pre-release version from GitHub
   --uninstall        Remove Tailscale (packages, binaries, config, state) and exit
   --help, -h         Show this help
