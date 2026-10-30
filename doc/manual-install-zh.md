@@ -385,7 +385,7 @@ tailscale awg status
    - OpenWrt 25.12：`apk add --allow-untrusted /tmp/tailscale_*.apk`
 4. 启动：`/etc/init.d/tailscale enable && /etc/init.d/tailscale start`，然后执行 `tailscale up`。
 
-也可以添加已签名的 [软件源](https://liutanglei.github.io/openwrt-tailscale-awg/)，通过 `opkg` / `apk` 获取更新。配置文件位于 `/etc/config/tailscale`。
+也可以添加已签名的 [软件源](https://github.com/LiuTangLei/openwrt-tailscale-awg/tree/feed)，通过 `opkg` / `apk` 获取更新。配置文件位于 `/etc/config/tailscale`。
 
 ## Android 与 iOS
 

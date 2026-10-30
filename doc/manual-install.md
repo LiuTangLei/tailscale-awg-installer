@@ -385,7 +385,7 @@ The [OpenWrt installer](https://github.com/LiuTangLei/openwrt-tailscale-awg) is 
    - OpenWrt 25.12: `apk add --allow-untrusted /tmp/tailscale_*.apk`
 4. Start it: `/etc/init.d/tailscale enable && /etc/init.d/tailscale start`, then `tailscale up`.
 
-You can also add the signed [package feed](https://liutanglei.github.io/openwrt-tailscale-awg/) to get updates through `opkg` / `apk`. Settings are in `/etc/config/tailscale`.
+You can also add the signed [package feed](https://github.com/LiuTangLei/openwrt-tailscale-awg/tree/feed) to get updates through `opkg` / `apk`. Settings are in `/etc/config/tailscale`.
 
 ## Android and iOS
 
