@@ -2,7 +2,7 @@
 
 [English](../README.md) · [中文](README-zh.md) · [Русский](README-ru.md) · [انتشارها](https://github.com/LiuTangLei/tailscale/releases/latest)
 
-**Current release: v1.104.4** — desktop, Docker, OpenWrt, Android and AwgScale.
+**Current release: v1.104.6** — desktop, Docker, OpenWrt, Android and AwgScale.
 یک فورک Tailscale با ترابری‌های AmneziaWG و QUIC مبهم‌سازی‌شده. با control plane رسمی Tailscale و Headscale کار می‌کند و تا زمانی که ترابری دیگری انتخاب نکنید، مانند Tailscale استاندارد رفتار می‌کند.
 
 [![Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=release)](https://github.com/LiuTangLei/tailscale/releases/latest) [![Docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=docker)](https://hub.docker.com/r/ltlei/tailscale-awg/tags)

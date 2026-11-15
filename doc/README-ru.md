@@ -2,7 +2,7 @@
 
 [English](../README.md) · [中文](README-zh.md) · [فارسی](README-fa.md) · [Релизы](https://github.com/LiuTangLei/tailscale/releases/latest)
 
-**Current release: v1.104.4** — desktop, Docker, OpenWrt, Android and AwgScale.
+**Current release: v1.104.6** — desktop, Docker, OpenWrt, Android and AwgScale.
 Форк Tailscale с транспортами AmneziaWG и обфусцированным QUIC. Работает с официальным control plane Tailscale и с Headscale и ведёт себя как обычный Tailscale, пока вы не выберете другой транспорт.
 
 [![Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=release)](https://github.com/LiuTangLei/tailscale/releases/latest) [![Docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=docker)](https://hub.docker.com/r/ltlei/tailscale-awg/tags)

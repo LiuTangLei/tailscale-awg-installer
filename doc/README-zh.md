@@ -2,7 +2,7 @@
 
 [English](../README.md) · [فارسی](README-fa.md) · [Русский](README-ru.md) · [下载](https://github.com/LiuTangLei/tailscale/releases/latest)
 
-**Current release: v1.104.4** — desktop, Docker, OpenWrt, Android and AwgScale.
+**Current release: v1.104.6** — desktop, Docker, OpenWrt, Android and AwgScale.
 带 AmneziaWG 与 QUIC 混淆传输的 Tailscale fork，兼容官方 Tailscale 控制端和 Headscale。在你切换传输之前，行为与标准 Tailscale 一致。
 
 [![Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=release)](https://github.com/LiuTangLei/tailscale/releases/latest) [![Docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=docker)](https://hub.docker.com/r/ltlei/tailscale-awg/tags)

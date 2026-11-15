@@ -2,7 +2,7 @@
 
 [中文](doc/README-zh.md) · [فارسی](doc/README-fa.md) · [Русский](doc/README-ru.md) · [Releases](https://github.com/LiuTangLei/tailscale/releases/latest)
 
-**Current release: v1.104.4** — desktop, Docker, OpenWrt, Android and AwgScale.
+**Current release: v1.104.6** — desktop, Docker, OpenWrt, Android and AwgScale.
 A Tailscale fork with AmneziaWG and obfuscated QUIC transports. It works with the official Tailscale control plane and Headscale, and behaves like standard Tailscale until you choose another transport.
 
 [![Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=release)](https://github.com/LiuTangLei/tailscale/releases/latest) [![Docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=docker)](https://hub.docker.com/r/ltlei/tailscale-awg/tags)
