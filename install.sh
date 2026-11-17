@@ -24,7 +24,7 @@ done
 
 case "$(uname -s)" in
     Linux)
-        if [ -d /jffs ] && command -v nvram >/dev/null 2>&1 &&
+        if [ -d /jffs ] && type nvram >/dev/null 2>&1 &&
            [ -n "$(nvram get productid 2>/dev/null)" ]; then
             platform=asus
         else
@@ -46,7 +46,7 @@ if [ "$platform" = asus ]; then
     shebang='#!/bin/sh'
     sources='https://gh-proxy.org https://ghfast.top direct'
 else
-    command -v bash >/dev/null 2>&1 || die 'Bash is required on Linux/macOS'
+    type bash >/dev/null 2>&1 || die 'Bash is required on Linux/macOS'
     url=https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-$platform.sh
     interpreter=bash
     shebang='#!/usr/bin/env bash'
@@ -66,9 +66,10 @@ else
     done
     [ "$want_mirror" = false ] || die '--mirror requires an HTTPS prefix'
 fi
-command -v curl >/dev/null 2>&1 || die 'curl is required'
+type curl >/dev/null 2>&1 || die 'curl is required'
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/tailscale-awg-install.XXXXXX")
+work=${TMPDIR:-/tmp}/tailscale-awg-install.$$
+mkdir "$work" || die 'cannot create a private temporary directory'
 trap 'rm -rf "$work"' 0
 trap 'exit 130' INT
 trap 'exit 143' TERM HUP

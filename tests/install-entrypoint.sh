@@ -26,6 +26,11 @@ cat >"$work/bin/sh" <<'EOF'
 echo 'bare sh was invoked' >&2
 exit 91
 EOF
+cat >"$work/bin/mktemp" <<'EOF'
+#!/bin/sh
+echo 'mktemp is unavailable on ASUS firmware' >&2
+exit 127
+EOF
 cat >"$work/bin/bash" <<'EOF'
 #!/bin/sh
 exec /bin/sh "$@"
