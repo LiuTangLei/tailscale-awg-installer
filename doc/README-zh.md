@@ -2,7 +2,7 @@
 
 [English](../README.md) · [فارسی](README-fa.md) · [Русский](README-ru.md) · [下载](https://github.com/LiuTangLei/tailscale/releases/latest)
 
-**Current release: v1.104.6** — desktop, Docker, OpenWrt, Android and AwgScale.
+**当前版本：v1.104.7**，覆盖桌面、Docker、OpenWrt、华硕、Android 和 AwgScale。
 带 AmneziaWG 与 QUIC 混淆传输的 Tailscale fork，兼容官方 Tailscale 控制端和 Headscale。在你切换传输之前，行为与标准 Tailscale 一致。
 
 [![Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=release)](https://github.com/LiuTangLei/tailscale/releases/latest) [![Docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=docker)](https://hub.docker.com/r/ltlei/tailscale-awg/tags)
@@ -29,6 +29,7 @@
 | Windows（管理员 PowerShell） | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` | [![release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=)](https://github.com/LiuTangLei/tailscale/releases/latest) |
 | Docker | `ltlei/tailscale-awg:latest`（[见下文](#docker)） | [![docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=)](https://hub.docker.com/r/ltlei/tailscale-awg/tags) |
 | OpenWrt | [安装器、软件包与软件源](https://github.com/LiuTangLei/openwrt-tailscale-awg) | [![openwrt](https://img.shields.io/github/v/release/LiuTangLei/openwrt-tailscale-awg?label=)](https://github.com/LiuTangLei/openwrt-tailscale-awg/releases/latest) |
+| 华硕原厂 / 梅林 | [一键安装与管理](#华硕原厂--梅林) | [![asus](https://img.shields.io/github/v/release/LiuTangLei/openwrt-tailscale-awg?label=)](https://github.com/LiuTangLei/openwrt-tailscale-awg/releases/latest) |
 | Android | [签名 APK](https://github.com/LiuTangLei/tailscale-android/releases/latest) | [![android](https://img.shields.io/github/v/release/LiuTangLei/tailscale-android?label=)](https://github.com/LiuTangLei/tailscale-android/releases/latest) |
 | iOS | [AwgScale IPA](https://github.com/LiuTangLei/AwgScale/releases/latest) | [![ios](https://img.shields.io/github/v/release/LiuTangLei/AwgScale?label=)](https://github.com/LiuTangLei/AwgScale/releases/latest) |
 
@@ -38,6 +39,18 @@
 - Windows GUI 必须与 fork 的基础 Tailscale 版本一致。
 - iOS 需要 TrollStore 或 Packet Tunnel 权限，IPA 不是 App Store 签名。
 - 系统包管理器升级可能换回官方二进制；`tailscale awg` 命令消失时重新运行安装器。
+
+### 华硕原厂 / 梅林
+
+SSH 登录路由器，以 root 执行：
+
+```sh
+curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install.sh | /bin/sh
+```
+
+入口自动识别华硕固件，转到[华硕专用安装器及中文菜单](https://github.com/LiuTangLei/openwrt-tailscale-awg/blob/main/asus/README.md)。重复执行即可登录、配置 AWG/QUIC、查看状态和日志、更新或回滚，下载自动切换镜像。请使用完整的 `/bin/sh`，华硕固件的裸 `sh` 命令可能是其他工具；不需要 Bash 或 USB。
+
+支持 ARM64 / ARMv7、Linux 3.2 及以上，已在 ET12 原厂和 ET8 梅林验证。压缩文件留在 JFFS，程序解压到内存运行。梅林按需启用 JFFS 自定义脚本；原厂需已有 fwtool custom-init 或 Entware 启动环境，安装器不修改固件分区。无人值守安装可将命令末尾改为 `/bin/sh -s -- --no-menu`。
 
 ## GitHub 镜像
 
@@ -64,7 +77,7 @@ $code = (iwr -useb "$m/https://raw.githubusercontent.com/LiuTangLei/tailscale-aw
 
 - 安装器通过 `api.github.com` 获取最新版本，先直连，失败再走镜像。多数镜像不代理 API；查询失败时改用 `gh-proxy.com`，或按上方徽章显示的版本加 `--version <tag>`。
 - 公共镜像由第三方运营，可能变更或失效；重要机器建议使用自建镜像。
-- OpenWrt 安装器会自动尝试上述镜像，自建镜像用 `install.sh --custom-proxy`。
+- OpenWrt、华硕安装器会自动尝试下载镜像；OpenWrt 自建镜像用 `install.sh --custom-proxy`。
 
 ## 连接与配置
 

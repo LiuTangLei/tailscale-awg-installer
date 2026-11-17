@@ -2,7 +2,7 @@
 
 [中文](doc/README-zh.md) · [فارسی](doc/README-fa.md) · [Русский](doc/README-ru.md) · [Releases](https://github.com/LiuTangLei/tailscale/releases/latest)
 
-**Current release: v1.104.6** — desktop, Docker, OpenWrt, Android and AwgScale.
+**Current release: v1.104.7** — desktop, Docker, OpenWrt, ASUS, Android and AwgScale.
 A Tailscale fork with AmneziaWG and obfuscated QUIC transports. It works with the official Tailscale control plane and Headscale, and behaves like standard Tailscale until you choose another transport.
 
 [![Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=release)](https://github.com/LiuTangLei/tailscale/releases/latest) [![Docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=docker)](https://hub.docker.com/r/ltlei/tailscale-awg/tags)
@@ -29,6 +29,7 @@ Version numbers follow upstream: fork `vX.Y.Z` is based on Tailscale `vX.Y.Z`.
 | Windows (Admin PowerShell) | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` | [![release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=)](https://github.com/LiuTangLei/tailscale/releases/latest) |
 | Docker | `ltlei/tailscale-awg:latest` ([see below](#docker)) | [![docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=)](https://hub.docker.com/r/ltlei/tailscale-awg/tags) |
 | OpenWrt | [Installer, packages and feed](https://github.com/LiuTangLei/openwrt-tailscale-awg) | [![openwrt](https://img.shields.io/github/v/release/LiuTangLei/openwrt-tailscale-awg?label=)](https://github.com/LiuTangLei/openwrt-tailscale-awg/releases/latest) |
+| ASUS stock / Merlin | [One-command installer](#asus-stock--merlin) | [![asus](https://img.shields.io/github/v/release/LiuTangLei/openwrt-tailscale-awg?label=)](https://github.com/LiuTangLei/openwrt-tailscale-awg/releases/latest) |
 | Android | [Signed APK](https://github.com/LiuTangLei/tailscale-android/releases/latest) | [![android](https://img.shields.io/github/v/release/LiuTangLei/tailscale-android?label=)](https://github.com/LiuTangLei/tailscale-android/releases/latest) |
 | iOS | [AwgScale IPA](https://github.com/LiuTangLei/AwgScale/releases/latest) | [![ios](https://img.shields.io/github/v/release/LiuTangLei/AwgScale?label=)](https://github.com/LiuTangLei/AwgScale/releases/latest) |
 
@@ -38,6 +39,18 @@ Version numbers follow upstream: fork `vX.Y.Z` is based on Tailscale `vX.Y.Z`.
 - The Windows GUI must match the fork's base Tailscale version.
 - iOS needs TrollStore or a Packet Tunnel entitlement; the IPA is not App Store signed.
 - A system package update may restore official binaries. Rerun the installer if `tailscale awg` disappears.
+
+### ASUS stock / Merlin
+
+Run as root over SSH:
+
+```sh
+curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install.sh | /bin/sh
+```
+
+The entry detects ASUS firmware and opens the [ASUS installer and management menu](https://github.com/LiuTangLei/openwrt-tailscale-awg/blob/main/asus/README.md). Rerun it for login, AWG/QUIC, status, logs, updates and rollback. It tries download mirrors automatically. Use `/bin/sh`: ASUS firmware may give the bare `sh` command another meaning. Bash and USB storage are not required.
+
+ARM64 / ARMv7 with Linux 3.2 or newer are supported; ET12 stock and ET8 Merlin have been tested. Compressed files stay in JFFS and the program runs from RAM. Merlin enables JFFS custom scripts when needed; stock firmware needs an existing fwtool custom-init or Entware startup hook. The installer does not modify firmware partitions. For unattended installation, append `-s -- --no-menu` after `/bin/sh`.
 
 ## GitHub mirrors
 
@@ -64,7 +77,7 @@ $code = (iwr -useb "$m/https://raw.githubusercontent.com/LiuTangLei/tailscale-aw
 
 - The installer finds the latest release through `api.github.com`, first directly and then through the mirror. Most mirrors do not proxy the API; if the lookup fails, use `gh-proxy.com` or add `--version <tag>` with the tag shown in the badge above.
 - Public mirrors are third-party services that can change or go offline. Use your own for important machines.
-- OpenWrt: the installer tries these mirrors automatically; use `install.sh --custom-proxy` for your own.
+- OpenWrt and ASUS try download mirrors automatically. OpenWrt also supports `install.sh --custom-proxy` for your own.
 
 ## Connect and configure
 

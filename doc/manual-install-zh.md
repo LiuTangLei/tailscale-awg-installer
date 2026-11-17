@@ -387,6 +387,10 @@ tailscale awg status
 
 也可以添加已签名的 [软件源](https://github.com/LiuTangLei/openwrt-tailscale-awg/tree/feed)，通过 `opkg` / `apk` 获取更新。配置文件位于 `/etc/config/tailscale`。
 
+## 华硕原厂与梅林
+
+ARM64 / ARMv7 路由器（包括无 USB 的机型）请用[华硕安装指南](README-zh.md#华硕原厂--梅林)。专用安装器将压缩文件保存在 JFFS、程序解压到内存运行，负责开机启动、升级和回滚。上面的通用 Linux 安装命令不适用于华硕固件。
+
 ## Android 与 iOS
 
 - **Android**：从 [Android Releases](https://github.com/LiuTangLei/tailscale-android/releases/latest) 下载 APK 并在设备上打开安装。如果装了 Google Play 的官方 Tailscale，需要先卸载，因为签名不同。之后的 fork 更新可直接覆盖安装并保留数据。

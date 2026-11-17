@@ -387,6 +387,10 @@ The [OpenWrt installer](https://github.com/LiuTangLei/openwrt-tailscale-awg) is 
 
 You can also add the signed [package feed](https://github.com/LiuTangLei/openwrt-tailscale-awg/tree/feed) to get updates through `opkg` / `apk`. Settings are in `/etc/config/tailscale`.
 
+## ASUS stock and Merlin
+
+Use the [ASUS installation guide](../README.md#asus-stock--merlin) for ARM64 / ARMv7 routers, including models without USB storage. The dedicated installer keeps compressed files in JFFS, runs the program in RAM and manages startup, upgrades and rollback. The generic Linux commands above do not apply to ASUS firmware.
+
 ## Android and iOS
 
 - **Android**: download the APK from [Android releases](https://github.com/LiuTangLei/tailscale-android/releases/latest) and open it on the device. If the official Tailscale app from Google Play is installed, uninstall it first, because the signatures differ. Later fork updates install over the old version and keep your data.

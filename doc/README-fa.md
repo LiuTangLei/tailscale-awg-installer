@@ -2,7 +2,7 @@
 
 [English](../README.md) · [中文](README-zh.md) · [Русский](README-ru.md) · [انتشارها](https://github.com/LiuTangLei/tailscale/releases/latest)
 
-**Current release: v1.104.6** — desktop, Docker, OpenWrt, Android and AwgScale.
+**Current release: v1.104.7** — desktop, Docker, OpenWrt, ASUS, Android and AwgScale.
 یک فورک Tailscale با ترابری‌های AmneziaWG و QUIC مبهم‌سازی‌شده. با control plane رسمی Tailscale و Headscale کار می‌کند و تا زمانی که ترابری دیگری انتخاب نکنید، مانند Tailscale استاندارد رفتار می‌کند.
 
 [![Release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=release)](https://github.com/LiuTangLei/tailscale/releases/latest) [![Docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=docker)](https://hub.docker.com/r/ltlei/tailscale-awg/tags)
@@ -29,6 +29,7 @@
 | Windows (PowerShell با دسترسی Admin) | `iwr -useb https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install-windows.ps1 \| iex` | [![release](https://img.shields.io/github/v/release/LiuTangLei/tailscale?label=)](https://github.com/LiuTangLei/tailscale/releases/latest) |
 | Docker | `ltlei/tailscale-awg:latest` ([پایین‌تر](#docker)) | [![docker](https://img.shields.io/docker/v/ltlei/tailscale-awg?sort=semver&label=)](https://hub.docker.com/r/ltlei/tailscale-awg/tags) |
 | OpenWrt | [نصب‌کننده، بسته‌ها و مخزن](https://github.com/LiuTangLei/openwrt-tailscale-awg) | [![openwrt](https://img.shields.io/github/v/release/LiuTangLei/openwrt-tailscale-awg?label=)](https://github.com/LiuTangLei/openwrt-tailscale-awg/releases/latest) |
+| ASUS / Merlin | [نصب با یک فرمان](../README.md#asus-stock--merlin) | [![asus](https://img.shields.io/github/v/release/LiuTangLei/openwrt-tailscale-awg?label=)](https://github.com/LiuTangLei/openwrt-tailscale-awg/releases/latest) |
 | Android | [APK امضاشده](https://github.com/LiuTangLei/tailscale-android/releases/latest) | [![android](https://img.shields.io/github/v/release/LiuTangLei/tailscale-android?label=)](https://github.com/LiuTangLei/tailscale-android/releases/latest) |
 | iOS | [AwgScale IPA](https://github.com/LiuTangLei/AwgScale/releases/latest) | [![ios](https://img.shields.io/github/v/release/LiuTangLei/AwgScale?label=)](https://github.com/LiuTangLei/AwgScale/releases/latest) |
 

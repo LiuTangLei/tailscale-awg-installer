@@ -1728,6 +1728,11 @@ show_awg_guidance() {
 
 # Main installation process
 main() {
+	if [[ -d /jffs ]] && has_cmd nvram && [[ -n $(nvram get productid 2>/dev/null) ]]; then
+		log R "ASUS firmware uses the router installer. Run:"
+		echo 'curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/LiuTangLei/tailscale-awg-installer/main/install.sh | /bin/sh'
+		return 1
+	fi
 	echo "🔧 Tailscale Amnezia-WG v2/v3 Installer"
 
 	# Parse arguments
@@ -1756,7 +1761,7 @@ main() {
 Usage: $0 [OPTIONS]
 Options:
   --mirror PREFIX     Use GitHub mirror
-  --version TAG       Use specific GitHub release tag (e.g. v1.104.6)
+  --version TAG       Use specific GitHub release tag (e.g. v1.104.7)
   --pre-release      Install the latest pre-release version from GitHub
   --uninstall        Remove Tailscale (packages, binaries, config, state) and exit
   --help, -h         Show this help

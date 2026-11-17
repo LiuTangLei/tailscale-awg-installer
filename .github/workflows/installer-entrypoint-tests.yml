@@ -1,0 +1,29 @@
+name: Installer entry point
+
+on:
+  push:
+    paths:
+      - install.sh
+      - install-linux.sh
+      - tests/install-entrypoint.sh
+      - .github/workflows/installer-entrypoint-tests.yml
+  pull_request:
+    paths:
+      - install.sh
+      - install-linux.sh
+      - tests/install-entrypoint.sh
+      - .github/workflows/installer-entrypoint-tests.yml
+
+permissions:
+  contents: read
+
+jobs:
+  busybox:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n install-linux.sh
+      - name: Test ASUS routing and download failures without networking
+        run: >-
+          docker run --rm --network none --read-only --tmpfs /tmp:rw,exec --tmpfs /jffs
+          -v "$PWD:/repo:ro" alpine:3.12 /bin/sh /repo/tests/install-entrypoint.sh
